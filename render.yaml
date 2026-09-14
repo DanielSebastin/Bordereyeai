@@ -4,7 +4,7 @@ services:
     name: bordereye-backend
     runtime: python
     plan: free
-    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    buildCommand: "pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt"
     startCommand: "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     autoDeploy: true

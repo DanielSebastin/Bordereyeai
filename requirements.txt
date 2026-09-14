@@ -1,7 +1,3 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-
-# AI-Powered CCTV Surveillance System - Features 12 & 13 Dependencies
-
 # Core Web & API
 fastapi>=0.100.0
 uvicorn>=0.23.0
@@ -10,12 +6,12 @@ pydantic-settings>=2.0.0
 python-multipart>=0.0.6
 jinja2>=3.1.2
 
-# Database & Vector DB
+# Database & Data Processing
 sqlalchemy>=2.0.0
 numpy>=1.24.0
 pandas>=1.5.0
 
-# LLM Providers & LangChain
+# LLM Providers & LangChain Query Engine
 langchain>=0.1.0
 langchain-community>=0.0.20
 langchain-core>=0.1.20
@@ -24,15 +20,11 @@ openai>=1.10.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 
-# Computer Vision & Machine Learning (Re-ID)
+# Computer Vision & Image Analytics
 opencv-python-headless>=4.8.0
 pillow>=9.5.0
 scikit-learn>=1.2.0
-torch>=2.0.0
-torchvision>=0.15.0
-ultralytics>=8.0.0
 
-# Audio & DSP Processing
+# Audio & Signal Processing
 scipy>=1.10.0
 soundfile>=0.12.0
-librosa>=0.10.0
