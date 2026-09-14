@@ -17,6 +17,7 @@ import {
   Cpu,
   Video
 } from "lucide-react";
+import { BACKEND_URL } from "@/lib/detectionStream";
 
 interface AudioEvent {
   label: string;
@@ -113,7 +114,7 @@ export default function AcousticClassifierWidget() {
     formData.append("sector", sector);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/audio/analyze", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/audio/analyze`, {
         method: "POST",
         body: formData,
       });

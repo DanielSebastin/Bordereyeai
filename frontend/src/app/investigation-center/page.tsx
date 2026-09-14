@@ -11,6 +11,7 @@ import Feature12QueryEngine from "@/components/query/Feature12QueryEngine";
 import GovFooter from "@/components/GovFooter";
 import { incidents as baseIncidents, linkedDetections as baseLinkedDetections, type Incident, type Priority } from "@/lib/investigationData";
 import { Activity, ShieldCheck, Radio } from "lucide-react";
+import { BACKEND_URL } from "@/lib/detectionStream";
 
 export default function InvestigationCenterPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,10 +25,10 @@ export default function InvestigationCenterPage() {
     const fetchLiveIncidents = async () => {
       try {
         const [faceRes, audioRes, evidenceRes, queryRes] = await Promise.allSettled([
-          fetch("http://localhost:8000/faces/alerts").then(r => r.ok ? r.json() : []),
-          fetch("http://localhost:8000/api/v1/audio/alerts").then(r => r.ok ? r.json() : []),
-          fetch("http://localhost:8000/api/v1/evidence/list").then(r => r.ok ? r.json() : []),
-          fetch("http://localhost:8000/api/v1/query/live").then(r => r.ok ? r.json() : { live_cameras: {} })
+          fetch(`${BACKEND_URL}/faces/alerts`).then(r => r.ok ? r.json() : []),
+          fetch(`${BACKEND_URL}/api/v1/audio/alerts`).then(r => r.ok ? r.json() : []),
+          fetch(`${BACKEND_URL}/api/v1/evidence/list`).then(r => r.ok ? r.json() : []),
+          fetch(`${BACKEND_URL}/api/v1/query/live`).then(r => r.ok ? r.json() : { live_cameras: {} })
         ]);
 
         const faceAlerts = faceRes.status === "fulfilled" && Array.isArray(faceRes.value) ? faceRes.value : [];

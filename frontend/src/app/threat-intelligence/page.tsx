@@ -30,6 +30,7 @@ import {
   type ActiveCamera,
   type Severity,
 } from "@/lib/threatIntelligenceData";
+import { BACKEND_URL } from "@/lib/detectionStream";
 
 export default function ThreatIntelligencePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,9 +46,9 @@ export default function ThreatIntelligencePage() {
     const fetchLiveData = async () => {
       try {
         const [liveRes, faceRes, audioRes] = await Promise.allSettled([
-          fetch("http://localhost:8000/api/v1/query/live").then(r => r.ok ? r.json() : {}),
-          fetch("http://localhost:8000/faces/alerts").then(r => r.ok ? r.json() : []),
-          fetch("http://localhost:8000/api/v1/audio/alerts").then(r => r.ok ? r.json() : [])
+          fetch(`${BACKEND_URL}/api/v1/query/live`).then(r => r.ok ? r.json() : {}),
+          fetch(`${BACKEND_URL}/faces/alerts`).then(r => r.ok ? r.json() : []),
+          fetch(`${BACKEND_URL}/api/v1/audio/alerts`).then(r => r.ok ? r.json() : [])
         ]);
 
         const liveData = liveRes.status === "fulfilled" ? liveRes.value : {};
