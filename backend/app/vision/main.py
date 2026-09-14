@@ -29,9 +29,20 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from ultralytics import YOLO
-from rapidocr_onnxruntime import RapidOCR
-import torch
+try:
+    from ultralytics import YOLO
+except Exception:
+    YOLO = None
+
+try:
+    from rapidocr_onnxruntime import RapidOCR
+except Exception:
+    RapidOCR = None
+
+try:
+    import torch
+except Exception:
+    torch = None
 
 from app import face_pipeline
 from app.anpr_util import refine_plate, complies_format

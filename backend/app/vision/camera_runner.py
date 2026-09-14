@@ -25,12 +25,27 @@ from typing import Optional, List, Dict, Any, Tuple
 
 warnings.filterwarnings("ignore", message=".*half.*deprecated.*")
 warnings.filterwarnings("ignore", message=".*torchvision.*")
-logging.getLogger("ultralytics").setLevel(logging.ERROR)
+try:
+    logging.getLogger("ultralytics").setLevel(logging.ERROR)
+except Exception:
+    pass
 
 import cv2
 import numpy as np
-import torch
-from ultralytics import YOLO
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except Exception:
+    torch = None
+    TORCH_AVAILABLE = False
+
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except Exception:
+    YOLO = None
+    YOLO_AVAILABLE = False
 
 try:
     from rapidocr_onnxruntime import RapidOCR
@@ -47,10 +62,10 @@ logger = logging.getLogger("bordereye.cameras")
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 WEIGHTS_PATH = BASE_DIR / "backend" / "weights" / "yolo11n.pt"
-DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-HALF = bool(torch.cuda.is_available())
+DEVICE = "cuda:0" if (TORCH_AVAILABLE and torch and torch.cuda.is_available()) else "cpu"
+HALF = bool(TORCH_AVAILABLE and torch and torch.cuda.is_available())
 
-_SHARED_YOLO: Optional[YOLO] = None
+_SHARED_YOLO: Optional[Any] = None
 _SHARED_OCR: Optional[Any] = None
 
 class CrossCameraRegistry:
@@ -170,9 +185,9 @@ def get_all_camera_states() -> Dict[str, Any]:
     with _CAMERA_STATE_LOCK:
         return dict(LATEST_CAMERA_STATES)
 
-def get_shared_yolo() -> Optional[YOLO]:
+def get_shared_yolo() -> Optional[Any]:
     global _SHARED_YOLO
-    if _SHARED_YOLO is None:
+    if _SHARED_YOLO is None and YOLO_AVAILABLE and YOLO is not None:
         try:
             w = resolve_weights()
             _SHARED_YOLO = YOLO(str(w))

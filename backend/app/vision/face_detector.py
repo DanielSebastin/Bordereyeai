@@ -5,17 +5,24 @@ import logging
 import warnings
 import cv2
 import numpy as np
-import torch
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+    _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+except Exception:
+    torch = None
+    TORCH_AVAILABLE = False
+    _DEVICE = "cpu"
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger("bordereye.face_detector")
 
 _FACENET_MODEL = None
-_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 def get_facenet_model():
     global _FACENET_MODEL
-    if _FACENET_MODEL is None:
+    if _FACENET_MODEL is None and TORCH_AVAILABLE:
         try:
             from facenet_pytorch import InceptionResnetV1
             _FACENET_MODEL = InceptionResnetV1(pretrained="vggface2").eval().to(_DEVICE)
@@ -37,6 +44,11 @@ class FaceDetector:
         """Extract a 512-d L2-normalized FaceNet embedding from a cropped BGR face image."""
         if face_bgr is None or face_bgr.size == 0:
             return np.zeros((512,), dtype=np.float32)
+        if not TORCH_AVAILABLE or torch is None:
+            gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
+            feat = cv2.resize(gray, (32, 16)).flatten().astype(np.float32)
+            n = float(np.linalg.norm(feat))
+            return feat / (n + 1e-6)
         try:
             rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
             resized = cv2.resize(rgb, (160, 160))
@@ -47,6 +59,8 @@ class FaceDetector:
             with torch.no_grad():
                 if self.facenet is None:
                     self.facenet = get_facenet_model()
+                if self.facenet is None:
+                    raise RuntimeError("FaceNet model not initialized")
                 emb = self.facenet(tensor).squeeze(0).cpu().numpy()
             
             norm = float(np.linalg.norm(emb))

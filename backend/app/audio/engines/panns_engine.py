@@ -4,8 +4,15 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except Exception:
+    torch = None
+    nn = None
+    TORCH_AVAILABLE = False
 
 from ..ontology import match_taxonomy
 from .assets import ensure_panns_labels, ensure_panns_weights
@@ -15,12 +22,16 @@ class PannsEngine:
     """PANNs CNN14 pretrained on AudioSet. Real checkpoint, no wget."""
 
     def __init__(self) -> None:
-        self.model: nn.Module | None = None
+        self.model: Any = None
         self.labels: list[str] = []
         self.error: str | None = None
-        self.device = torch.device("cpu")
+        self.device = torch.device("cpu") if TORCH_AVAILABLE and torch else None
 
     def load(self) -> None:
+        if not TORCH_AVAILABLE or torch is None:
+            self.error = "PyTorch is not available"
+            self.model = None
+            return
         try:
             labels_csv = ensure_panns_labels()
             weights = ensure_panns_weights()
