@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 try:
     import soundfile as sf
-except ImportError:
+except (ImportError, OSError, Exception):
     sf = None
 
 from .config import settings

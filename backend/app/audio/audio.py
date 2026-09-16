@@ -16,7 +16,7 @@ except ImportError:
 import numpy as np
 try:
     import soundfile as sf
-except ImportError:
+except (ImportError, OSError, Exception):
     sf = None
 
 from scipy import signal
