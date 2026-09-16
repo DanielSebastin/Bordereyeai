@@ -18,15 +18,22 @@ class PersonDetector:
         self._init_detector()
 
     def _init_detector(self):
-        """Initializes YOLO if ultralytics is available; else falls back to OpenCV HOG."""
+        """Initializes YOLO if ultralytics is available; else falls back to OpenCV HOG / Cascade."""
         try:
             from ultralytics import YOLO
             self.yolo_model = YOLO(self.model_name)
             print(f"[PersonDetector] Ultralytics YOLO initialized successfully ({self.model_name}).")
         except Exception as e:
-            print(f"[PersonDetector] YOLO unavailable ({e}). Falling back to OpenCV HOG Person Detector.")
-            self.hog_detector = cv2.HOGDescriptor()
-            self.hog_detector.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+            print(f"[PersonDetector] YOLO unavailable ({e}). Initializing lightweight detector.")
+            try:
+                if hasattr(cv2, "HOGDescriptor") and hasattr(cv2, "HOGDescriptor_getDefaultPeopleDetector"):
+                    self.hog_detector = cv2.HOGDescriptor()
+                    self.hog_detector.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+                else:
+                    self.hog_detector = None
+            except Exception as e2:
+                print(f"[PersonDetector] HOG initialization skipped ({e2}).")
+                self.hog_detector = None
 
     def detect_and_crop(self, frame: np.ndarray) -> List[Dict[str, Any]]:
         """
@@ -78,27 +85,30 @@ class PersonDetector:
 
         # OpenCV HOG Fallback
         if self.hog_detector is not None:
-            boxes, weights = self.hog_detector.detectMultiScale(
-                frame,
-                winStride=(8, 8),
-                padding=(8, 8),
-                scale=1.05
-            )
-            for (x, y, bw, bh), weight in zip(boxes, weights):
-                try:
-                    conf = float(np.squeeze(weight))
-                except Exception:
-                    conf = 0.85
-                x1, y1 = max(0, int(x)), max(0, int(y))
-                x2, y2 = min(w, int(x + bw)), min(h, int(y + bh))
-                
-                if (x2 - x1) > 20 and (y2 - y1) > 35:
-                    crop = frame[y1:y2, x1:x2].copy()
-                    detections.append({
-                        "bbox": [x1, y1, x2, y2],
-                        "confidence": round(min(0.99, max(0.5, conf)), 4),
-                        "crop": crop,
-                        "aspect_ratio": round(bh / max(1, bw), 2)
-                    })
+            try:
+                boxes, weights = self.hog_detector.detectMultiScale(
+                    frame,
+                    winStride=(8, 8),
+                    padding=(8, 8),
+                    scale=1.05
+                )
+                for (x, y, bw, bh), weight in zip(boxes, weights):
+                    try:
+                        conf = float(np.squeeze(weight))
+                    except Exception:
+                        conf = 0.85
+                    x1, y1 = max(0, int(x)), max(0, int(y))
+                    x2, y2 = min(w, int(x + bw)), min(h, int(y + bh))
+                    
+                    if (x2 - x1) > 20 and (y2 - y1) > 35:
+                        crop = frame[y1:y2, x1:x2].copy()
+                        detections.append({
+                            "bbox": [x1, y1, x2, y2],
+                            "confidence": round(min(0.99, max(0.5, conf)), 4),
+                            "crop": crop,
+                            "aspect_ratio": round(bh / max(1, bw), 2)
+                        })
+            except Exception:
+                pass
 
         return detections
