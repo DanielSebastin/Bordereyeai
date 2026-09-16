@@ -35,9 +35,14 @@ def get_facenet_model():
 class FaceDetector:
     def __init__(self, det_size: int = 640, min_det_score: float = 0.3) -> None:
         self.min_det_score = min_det_score
-        c1 = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        c2 = cv2.data.haarcascades + "haarcascade_frontalface_alt2.xml"
-        self.cascades = [cv2.CascadeClassifier(c1), cv2.CascadeClassifier(c2)]
+        self.cascades = []
+        try:
+            if hasattr(cv2, 'CascadeClassifier') and hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
+                c1 = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+                c2 = cv2.data.haarcascades + "haarcascade_frontalface_alt2.xml"
+                self.cascades = [cv2.CascadeClassifier(c1), cv2.CascadeClassifier(c2)]
+        except Exception as e:
+            logger.warning(f"CascadeClassifier initialization notice: {e}")
         self.facenet = get_facenet_model()
 
     def _extract_tensor_embedding(self, face_bgr: np.ndarray) -> np.ndarray:

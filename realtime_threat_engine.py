@@ -12,11 +12,19 @@ class RealTimeThreatAndExpressionEngine:
     """
 
     def __init__(self):
-        # Load OpenCV Haar cascade models
-        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-        self.smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
-        self.upperbody_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
+        # Load OpenCV Haar cascade models safely
+        self.face_cascade = None
+        self.eye_cascade = None
+        self.smile_cascade = None
+        self.upperbody_cascade = None
+        try:
+            if hasattr(cv2, 'CascadeClassifier') and hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
+                self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+                self.smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
+                self.upperbody_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
+        except Exception as e:
+            print(f"[RealTimeThreatEngine] CascadeClassifier initialization notice: {e}")
 
     def analyze_frame(self, frame: np.ndarray, prev_gray: np.ndarray = None) -> Dict[str, Any]:
         """
@@ -35,7 +43,12 @@ class RealTimeThreatAndExpressionEngine:
             motion_score = float(np.mean(diff))
 
         # 2. Face & Emotion Analysis
-        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
+        faces = ()
+        if self.face_cascade is not None:
+            try:
+                faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
+            except Exception:
+                faces = ()
         
         person_detected = len(faces) > 0
         expression = "Neutral / Calm"
@@ -49,12 +62,20 @@ class RealTimeThreatAndExpressionEngine:
             face_roi_gray = gray[fy:fy+fh, fx:fx+fw]
 
             # Eye detection
-            eyes = self.eye_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(18, 18))
-            eyes_detected_count = len(eyes)
+            if self.eye_cascade is not None:
+                try:
+                    eyes = self.eye_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(18, 18))
+                    eyes_detected_count = len(eyes)
+                except Exception:
+                    eyes_detected_count = 0
 
             # Smile detection
-            smiles = self.smile_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.7, minNeighbors=20, minSize=(25, 25))
-            smile_detected = len(smiles) > 0
+            if self.smile_cascade is not None:
+                try:
+                    smiles = self.smile_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.7, minNeighbors=20, minSize=(25, 25))
+                    smile_detected = len(smiles) > 0
+                except Exception:
+                    smile_detected = False
 
             # Expression classification logic based on brow gradient, eye state, and smile
             # Measure gradient in upper face (brow area) for frowning / anger furrow
