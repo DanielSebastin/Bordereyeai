@@ -136,6 +136,29 @@ if not recordings_dir.exists():
 app.mount("/recordings", StaticFiles(directory="data/cam_samples"), name="recordings")
 
 # ── Top-Level IVBAP Compatibility Endpoints ──────────────────────────────────
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "BorderEye Unified AI Surveillance & Intelligence Platform",
+        "version": "2.0.0",
+        "docs_url": "/docs",
+        "health_url": "/health",
+        "classification": "RESTRICTED / BORDER SECURITY COMMAND",
+        "endpoints": {
+            "system_health": "/api/v1/system/health",
+            "system_kpis": "/api/v1/system/kpis",
+            "reid_cameras": "/api/v1/reid/cameras",
+            "reid_persons": "/api/v1/reid/persons",
+            "reid_trajectories": "/api/v1/reid/trajectories",
+            "query_live": "/api/v1/query/live",
+            "audio_sectors": "/api/v1/audio/sectors",
+            "audio_alerts": "/api/v1/audio/alerts",
+            "drone_status": "/api/v1/audio/drone/status",
+            "evidence_list": "/api/v1/evidence/list"
+        }
+    }
+
 @app.get("/health")
 async def health():
     return {

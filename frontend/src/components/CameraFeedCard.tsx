@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { CameraFeed } from "@/lib/liveMonitoringData";
 import PersonnelEnrollmentModal from "@/components/PersonnelEnrollmentModal";
+import CCTVStreamCanvas from "@/components/CCTVStreamCanvas";
 import {
   useDetectionStream,
   BACKEND_URL,
@@ -1012,6 +1013,7 @@ export default function CameraFeedCard({
   onCollapse,
 }: CameraFeedCardProps) {
   const [hovered, setHovered] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -1257,25 +1259,36 @@ export default function CameraFeedCard({
         </div>
       ) : (
         <div style={{ position: "absolute", inset: 0, background: "#050B13" }}>
-          <video
-            ref={videoRef}
-            key={feed.id}
-            src={feed.videoSrc || feed.streamUrl || `/${feed.id}.mp4`}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            onClick={isFenceCam && drawFence ? addVertex : undefined}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: expanded ? "contain" : "cover",
-              display: "block",
-              background: "#000",
-              cursor: isFenceCam && drawFence ? "crosshair" : "default",
-            }}
-          />
+          {!videoFailed ? (
+            <video
+              ref={videoRef}
+              key={feed.id}
+              src={feed.videoSrc || feed.streamUrl || `/${feed.id}.mp4`}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              onError={() => setVideoFailed(true)}
+              onClick={isFenceCam && drawFence ? addVertex : undefined}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: expanded ? "contain" : "cover",
+                display: "block",
+                background: "#000",
+                cursor: isFenceCam && drawFence ? "crosshair" : "default",
+              }}
+            />
+          ) : (
+            <CCTVStreamCanvas
+              cameraId={feed.id}
+              cameraName={feed.name}
+              sector={feed.sector}
+              fps={feed.fps}
+              expanded={expanded}
+            />
+          )}
         </div>
       )}
 
