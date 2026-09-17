@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 */node_modules/
 .pnp
@@ -42,6 +42,19 @@ deployment/
 *.mpeg
 *.mp3
 *.wav
+
+# Whitelist web-optimized camera videos only at root and frontend/public/
+frontend/public/recordings/*.mp4
+!/frontend/public/cam1.mp4
+!/frontend/public/cam2.mp4
+!/frontend/public/cam3.mp4
+!/frontend/public/cam4.mp4
+!/frontend/public/cam5.mp4
+!/cam1.mp4
+!/cam2.mp4
+!/cam3.mp4
+!/cam4.mp4
+!/cam5.mp4
 
 # Model weights
 *.pt

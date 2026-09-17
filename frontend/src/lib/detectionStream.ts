@@ -1,6 +1,28 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export function getBackendUrl(): string {
+  if (typeof window !== "undefined") {
+    // If running on Render (e.g. *.onrender.com)
+    if (window.location.hostname.includes("onrender.com")) {
+      return "https://bordereye-backend.onrender.com";
+    }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://127.0.0.1:8000";
+    }
+    const host = window.location.hostname;
+    return `${window.location.protocol}//${host}:8000`;
+  }
+  let url = process.env.NEXT_PUBLIC_API_URL || "";
+  if (url) {
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = `https://${url}`;
+    }
+    return url.replace(/\/$/, "");
+  }
+  return "https://bordereye-backend.onrender.com";
+}
+
+export const BACKEND_URL = getBackendUrl();
 
 export type FencePoint = [number, number];
 
