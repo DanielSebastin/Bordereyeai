@@ -1,0 +1,38 @@
+# Git & VCS
+.git/
+.gitignore
+
+# Dependencies & Build artifacts
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+build/
+dist/
+deployment/
+env/
+venv/
+.venv/
+__pycache__/
+*/**/__pycache__/
+*.pyc
+*.pyo
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Temp & Cache
+data/cache/
+data/crops/*
+data/audio_evidence/*
+data/vector_db/*
+surveillance.db
+*.sqlite3
+
+# Large local recordings (>100MB)
+frontend/public/recordings/*.mp4
+recordings/*.mp4

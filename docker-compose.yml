@@ -1,0 +1,72 @@
+services:
+  # ── 1. Deep Learning Surveillance Backend (FastAPI + PyTorch + CUDA) ────────
+  backend:
+    image: ghcr.io/praveen21-tech/sih_border_survelliance/backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: bordereye-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - bordereye-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - bordereye-net
+
+  # ── 2. Government Surveillance UI (Next.js Dashboard) ──────────────────────
+  frontend:
+    image: ghcr.io/praveen21-tech/sih_border_survelliance/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+    container_name: bordereye-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - bordereye-net
+
+volumes:
+  bordereye-data:
+    driver: local
+
+networks:
+  bordereye-net:
+    driver: bridge

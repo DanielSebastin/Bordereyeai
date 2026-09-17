@@ -72,13 +72,13 @@ Operator Query: "{user_query}"
 Query Intent: {intent}
 
 Structured Database Records:
-{json.dumps(sql_records[:10], indent=2)}
+{json.dumps(sql_records[:10], indent=2, default=str)}
 
 Semantic Incident Context:
-{json.dumps([v['document'] for v in vector_hits], indent=2)}
+{json.dumps([v.get('document', '') for v in vector_hits if isinstance(v, dict)], indent=2, default=str)}
 
 Cross-Camera Movement Trajectory:
-{json.dumps(trajectory_data, indent=2) if trajectory_data else 'None'}
+{json.dumps(trajectory_data, indent=2, default=str) if trajectory_data else 'None'}
 
 Please provide a comprehensive, actionable surveillance report answering the operator's query.
 """

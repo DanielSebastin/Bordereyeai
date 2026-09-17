@@ -116,32 +116,38 @@ class SurveillanceTextToSQL:
         if any(f in sql_query.lower() for f in forbidden):
             sql_query = "SELECT * FROM surveillance_events ORDER BY timestamp DESC LIMIT 5;"
 
+        def _serialize_rows(rows_list):
+            out = []
+            for row in rows_list:
+                new_row = {}
+                for k, v in row.items():
+                    if hasattr(v, "isoformat"):
+                        new_row[k] = v.isoformat()
+                    elif isinstance(v, (int, float, bool, str, list, dict)) or v is None:
+                        new_row[k] = v
+                    else:
+                        new_row[k] = str(v)
+                out.append(new_row)
+            return out
+
         # Execute Query
         try:
             result = db.execute(text(sql_query))
             keys = result.keys()
             rows = [dict(zip(keys, row)) for row in result.fetchall()]
-            
-            # Format datetime objects for JSON serialization
-            serialized_rows = []
-            for row in rows:
-                new_row = {}
-                for k, v in row.items():
-                    if hasattr(v, "isoformat"):
-                        new_row[k] = v.isoformat()
-                    else:
-                        new_row[k] = v
-                serialized_rows.append(new_row)
-
-            return sql_query, serialized_rows
+            return sql_query, _serialize_rows(rows)
         except Exception as e:
             print(f"[TextToSQL] Execution error ({e}) on SQL: {sql_query}")
-            # Fallback query
-            fallback_sql = "SELECT id, event_type, camera_id, timestamp, severity, description FROM surveillance_events ORDER BY timestamp DESC LIMIT 5;"
-            res = db.execute(text(fallback_sql))
-            keys = res.keys()
-            rows = [dict(zip(keys, row)) for row in res.fetchall()]
-            return fallback_sql, rows
+            try:
+                # Fallback query
+                fallback_sql = "SELECT id, event_type, camera_id, timestamp, severity, description FROM surveillance_events ORDER BY timestamp DESC LIMIT 5;"
+                res = db.execute(text(fallback_sql))
+                keys = res.keys()
+                rows = [dict(zip(keys, row)) for row in res.fetchall()]
+                return fallback_sql, _serialize_rows(rows)
+            except Exception as e2:
+                print(f"[TextToSQL] Fallback query error ({e2})")
+                return "SELECT 1;", []
 
     def _clean_sql(self, raw_text: str) -> str:
         """Extracts SQL statement from markdown fences or text."""

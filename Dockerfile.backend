@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# BorderEye AI Surveillance Platform - CUDA-Enabled AI Backend Dockerfile
+# Base: PyTorch with CUDA 12.1 and cuDNN 8 runtime
+# Supports: YOLOv11, OSNet Re-ID, Fast-ANPR, YAMNet, Drone Acoustic Sentry, RAG
+# ─────────────────────────────────────────────────────────────────────────────
+FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
+
+LABEL maintainer="BorderEye AI Command <praveen2006offical@gmail.com>"
+LABEL org.opencontainers.image.title="BorderEye AI Backend"
+LABEL org.opencontainers.image.description="Unified Deep Learning Surveillance Engine with CUDA GPU Acceleration"
+LABEL org.opencontainers.image.source="https://github.com/praveen21-tech/sih_border_survelliance"
+
+# Set environment
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+
+# Install system runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libgl1 \
+    libglib2.0-0 \
+    libsndfile1 \
+    curl \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy and install python dependencies
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/requirements.txt
+
+# Copy application source code
+COPY . /app
+
+# Ensure runtime directories exist
+RUN mkdir -p /app/data/crops /app/data/audio_evidence /app/data/vector_db /app/backend/weights
+
+# Expose API port
+EXPOSE 8000
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Launch FastAPI application
+CMD ["python", "-m", "backend.app.main"]

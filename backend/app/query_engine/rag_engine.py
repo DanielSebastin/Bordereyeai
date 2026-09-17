@@ -171,19 +171,19 @@ Operator Query: "{user_query}"
 Query Intent: {intent}
 
 === LIVE REAL-TIME MULTI-CAMERA TELEMETRY ===
-{json.dumps(live_telemetry, indent=2)}
+{json.dumps(live_telemetry, indent=2, default=str)}
 
 === STRUCTURED DATABASE INCIDENTS ===
-{json.dumps(sql_records[:10], indent=2)}
+{json.dumps(sql_records[:10], indent=2, default=str)}
 
 === SEMANTIC VECTOR INCIDENT CONTEXT ===
-{json.dumps([v['document'] for v in vector_hits], indent=2)}
+{json.dumps([v.get('document', '') for v in vector_hits if isinstance(v, dict)], indent=2, default=str)}
 
 === CROSS-CAMERA MOVEMENT TRAJECTORY ===
-{json.dumps(trajectory_data, indent=2) if trajectory_data else 'None'}
+{json.dumps(trajectory_data, indent=2, default=str) if trajectory_data else 'None'}
 
 === EVIDENCE CAPTURE RECORD ===
-{json.dumps(stored_evidence, indent=2) if stored_evidence else 'None'}
+{json.dumps(stored_evidence, indent=2, default=str) if stored_evidence else 'None'}
 
 Please provide a comprehensive, actionable surveillance report answering the operator's query directly using the live data and historical context.
 """
