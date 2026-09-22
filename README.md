@@ -6,7 +6,7 @@
 
 ### *AI-Based Intelligent Video Analytics Platform for Border Surveillance using Existing CCTV Infrastructure*
 
-**Smart India Hackathon 2024 | Ministry of Home Affairs — Border Security Division**
+**Smart India Hackathon 2026 | Ministry of Home Affairs — Border Security Division**
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-bordereye--frontend.onrender.com-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
