@@ -442,7 +442,7 @@ cam5.mp4   → Watchlist monitoring
 
 <div align="center">
 
-**Built for Smart India Hackathon 2024**  
+**Built for Smart India Hackathon 2026**  
 Ministry of Home Affairs — Border Security Division
 
 > *"Transforming passive CCTV infrastructure into an active, intelligent border sentinel — entirely in software."*
