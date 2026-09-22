@@ -329,9 +329,6 @@ sih_border_surveillance/
 │       ├── components/              # Reusable UI components
 │       └── lib/                     # API clients & data hooks
 │
-├── reid_engine/                     # Standalone Re-ID module
-├── nl_query_engine/                 # Standalone NL query module
-├── database/                        # DB init scripts & seed data
 ├── docker-compose.yml               # Full-stack Docker orchestration
 ├── Dockerfile.backend               # Backend container (CUDA-enabled)
 ├── requirements.txt                 # Python dependencies
