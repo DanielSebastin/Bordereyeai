@@ -3,6 +3,7 @@ from __future__ import annotations
 #
 # Detects faces, matches against enrolled authorized personnel, categorizes
 # all unrecognized faces as INTRUDERS, and streams real-time access alerts.
+# Supports runtime camera selection via API.
 
 import json
 import logging
@@ -36,6 +37,8 @@ KEEP_ALERTS = 50
 WL_COLOR = (34, 197, 94)        # BGR Green  — Authorized
 INTRUDER_COLOR = (50, 50, 239)   # BGR Red    — Intruder
 
+
+# ── State ─────────────────────────────────────────────────────────────────────
 @dataclass
 class FacePipelineState:
     camera_id: str = CAMERA_ID
@@ -56,15 +59,21 @@ class FacePipelineState:
     lock: threading.RLock = field(default_factory=threading.RLock)
     tracker: dict[int, dict] = field(default_factory=dict)
     next_id: int = 1
+    # Camera selection
+    selected_camera_index: int = 0
+    camera_change_requested: bool = False
+
 
 FACE_PIPELINE = FacePipelineState()
 _broadcast = None
 _broadcast_lock = threading.Lock()
 
+
 def set_broadcaster(fn) -> None:
     global _broadcast
     with _broadcast_lock:
         _broadcast = fn
+
 
 def _emit(payload: dict) -> None:
     with _broadcast_lock:
@@ -75,6 +84,8 @@ def _emit(payload: dict) -> None:
         except Exception:
             pass
 
+
+# ── Face association (IoU tracker) ────────────────────────────────────────────
 def _iou_px(a: tuple, b: tuple) -> float:
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
@@ -87,6 +98,7 @@ def _iou_px(a: tuple, b: tuple) -> float:
     a_area = (ax2 - ax1) * (ay2 - ay1)
     b_area = (bx2 - bx1) * (by2 - by1)
     return inter / (a_area + b_area - inter)
+
 
 def _track(faces: list[dict], prev: dict[int, dict], now: float) -> list[tuple[int, list, float]]:
     results: list[tuple[int, list, float]] = []
@@ -113,6 +125,8 @@ def _track(faces: list[dict], prev: dict[int, dict], now: float) -> list[tuple[i
         results.append((fid, fb, f["det_score"]))
     return results
 
+
+# ── Alerts ────────────────────────────────────────────────────────────────────
 def _append_alert(status: str, name: str, designation: str, confidence: float) -> dict:
     now = time.time()
     is_auth = (status == "AUTHORIZED")
@@ -136,12 +150,14 @@ def _append_alert(status: str, name: str, designation: str, confidence: float) -
     _persist_alerts()
     return alert
 
+
 def _persist_alerts() -> None:
     try:
         ALERT_LOG.parent.mkdir(parents=True, exist_ok=True)
         ALERT_LOG.write_text(json.dumps(FACE_PIPELINE.alerts, indent=2), encoding="utf-8")
     except Exception:
         pass
+
 
 def _load_alerts() -> None:
     try:
@@ -150,83 +166,204 @@ def _load_alerts() -> None:
     except Exception:
         FACE_PIPELINE.alerts = []
 
-def _open_camera():
-    # 1. Try real hardware webcam
+
+# ── Camera selection ──────────────────────────────────────────────────────────
+def _open_camera(camera_index: int = 0):
+    """Open a specific camera by index with read timeout. Returns (cap, dims, is_webcam, actual_index)."""
+    import threading
+    
+    def try_read(cap_obj, result_list):
+        """Helper to read frame in thread with timeout"""
+        try:
+            ret, frame = cap_obj.read()
+            result_list.append((ret, frame))
+        except Exception as e:
+            result_list.append((False, None))
+    
     for backend in (cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY):
-        cap = cv2.VideoCapture(0, backend)
+        cap = cv2.VideoCapture(camera_index, backend)
         if cap.isOpened():
-            ret, frame = cap.read()
-            if ret and frame is not None:
-                return cap, frame.shape[:2], True
-    # 2. Fallback to video footage if no hardware webcam connected
-    fallback_vids = [
-        BASE_DIR / "frontend" / "public" / "cam2.mp4",
-        BASE_DIR / "frontend" / "public" / "cam1.mp4",
-        BASE_DIR / "cam2.mp4",
-    ]
-    for v in fallback_vids:
-        if v.exists():
-            cap = cv2.VideoCapture(str(v))
+            # Set buffer size to 1 to reduce lag
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            cap.set(cv2.CAP_PROP_FPS, 30)
+            
+            # Try reading with 3-second timeout
+            result = []
+            read_thread = threading.Thread(target=try_read, args=(cap, result), daemon=True)
+            read_thread.start()
+            read_thread.join(timeout=3.0)
+            
+            if result and result[0][0] and result[0][1] is not None:
+                frame = result[0][1]
+                h, w = frame.shape[:2]
+                logger.info(f"[cam-06] Camera {camera_index} opened: {w}x{h} via {backend}")
+                return cap, (h, w), True, camera_index
+            
+            # Timeout or failed read
+            logger.warning(f"[cam-06] Camera {camera_index} backend {backend} failed/timeout")
+            cap.release()
+    
+    logger.error(f"[cam-06] Camera {camera_index} unavailable on all backends")
+    return None, (480, 640), False, None
+
+
+def get_available_cameras() -> list[dict]:
+    """Scan for available hardware cameras and return their info."""
+    available = []
+    for idx in range(5):
+        cap = None
+        for backend in (cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY):
+            cap = cv2.VideoCapture(idx, backend)
             if cap.isOpened():
                 ret, frame = cap.read()
                 if ret and frame is not None:
-                    return cap, frame.shape[:2], False
-    return None, (480, 640), False
+                    h, w = frame.shape[:2]
+                    available.append({
+                        "index": idx,
+                        "name": f"Camera {idx}",
+                        "resolution": f"{w}x{h}",
+                    })
+                    cap.release()
+                    cap = None
+                    break
+                cap.release()
+                cap = None
+        if cap is not None:
+            cap.release()
+    return available
 
+
+def set_camera_index(index: int) -> dict:
+    """Change the active camera index. Triggers hot-swap on next loop."""
+    with FACE_PIPELINE.lock:
+        FACE_PIPELINE.selected_camera_index = index
+        FACE_PIPELINE.camera_change_requested = True
+    logger.info(f"[cam-06] Camera change requested to index {index}")
+    return {"success": True, "camera_index": index}
+
+
+# ── Pipeline loop ─────────────────────────────────────────────────────────────
 def run_webcam_pipeline(state: FacePipelineState = FACE_PIPELINE) -> None:
-    detector = FaceDetector(min_det_score=MIN_DET_SCORE)
+    """Blocking loop; run on its own daemon thread (see main.py startup)."""
+    import queue as _queue
+
+    detector = FaceDetector(det_size=320, min_det_score=MIN_DET_SCORE)
     manager = WatchlistManager()
     recognizer = FaceRecognizer(manager, threshold=MATCH_THRESHOLD)
+
+    if manager.watchlist_ready():
+        logger.info(f"[cam-06] Watchlist loaded: {manager.embedding_count()} embedding(s) "
+                     f"for {[p['name'] for p in manager.get_people()]}")
+    else:
+        logger.warning("[cam-06] Watchlist is EMPTY — run train_watchlist to enroll faces")
+
     _load_alerts()
     state.t0 = time.time()
 
+    # ── Thread-safe detection queue ────────────────────────────────────────────
+    # Producer: capture loop puts raw frames here.
+    # Consumer: detector_thread picks them up and runs InsightFace.
+    _frame_q: _queue.Queue = _queue.Queue(maxsize=2)
+    _result_q: _queue.Queue = _queue.Queue(maxsize=4)
+
+    def _detector_thread():
+        """InsightFace runs here — completely isolated from capture/HTTP."""
+        while not state.stop:
+            try:
+                frame = _frame_q.get(timeout=0.5)
+            except _queue.Empty:
+                continue
+            try:
+                faces = detector.recognize(frame, max_num=MAX_FACES)
+            except Exception as e:
+                logger.error(f"[cam-06] Detection error: {e}")
+                faces = []
+            try:
+                _result_q.put_nowait((frame, faces))
+            except _queue.Full:
+                try:
+                    _result_q.get_nowait()
+                except _queue.Empty:
+                    pass
+                try:
+                    _result_q.put_nowait((frame, faces))
+                except _queue.Full:
+                    pass
+
+    det_thread = threading.Thread(target=_detector_thread, daemon=True, name="cam06-insightface")
+    det_thread.start()
+    logger.info("[cam-06] InsightFace detector thread started.")
+
     while not state.stop:
-        cap, dims, is_real_webcam = _open_camera()
+        # Read selected camera index
+        with state.lock:
+            selected_idx = state.selected_camera_index
+            state.camera_change_requested = False
+
+        cap, dims, is_real_webcam, actual_idx = _open_camera(selected_idx)
         if cap is None:
             state.webcam = False
-            time.sleep(2.0)
+            logger.warning(f"[cam-06] Camera {selected_idx} unavailable — retrying in 10s")
+            time.sleep(10.0)
             continue
 
         state.webcam = is_real_webcam
         state.annotated_dims = dims
-        logger.info(f"[cam-06] Access Control active ({dims[1]}x{dims[0]}, hardware_webcam={is_real_webcam})")
+        logger.info(f"[cam-06] Access Control active (Camera {actual_idx}, {dims[1]}x{dims[0]})")
 
         try:
             while not state.stop:
+                # Check if camera change was requested
+                with state.lock:
+                    if state.camera_change_requested:
+                        logger.info("[cam-06] Camera change requested, restarting capture...")
+                        break
+
                 ret, frame = cap.read()
                 if not ret:
-                    if not is_real_webcam:
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                        continue
+                    logger.warning(f"[cam-06] Frame read failed (ret={ret}), camera disconnected")
                     break
 
                 state.frames_read += 1
                 now = time.time()
-                if now - state.last_process_at < PROCESS_EVERY_S:
-                    continue
-                state.last_process_at = now
 
+                # Always serve the latest raw frame to the MJPEG endpoint
                 with state.lock:
                     state.raw_frame = frame.copy()
+                    if state.annotated is None:
+                        state.annotated = frame.copy()
 
-                t0 = time.time()
-                faces = detector.recognize(frame, max_num=MAX_FACES)
-                dt = time.time() - t0
-                state.efps = (state.efps * 0.85 + (1.0 / dt) * 0.15) if state.efps else 1.0 / dt
+                # Push frame to detector queue (non-blocking, drop if busy)
+                if now - state.last_process_at >= PROCESS_EVERY_S:
+                    state.last_process_at = now
+                    try:
+                        _frame_q.put_nowait(frame.copy())
+                    except _queue.Full:
+                        pass  # detector still busy — skip this frame
 
+                # Pull latest detection results (non-blocking)
+                try:
+                    det_frame, faces = _result_q.get_nowait()
+                except _queue.Empty:
+                    # No new result yet — keep showing last annotated frame
+                    continue
+
+                # ── Tracking + recognition ──────────────────────────────────
                 tracked_ids = _track(faces, state.tracker, now)
                 new_tracker: dict[int, dict] = {}
-                annotated = frame.copy()
+                annotated = det_frame.copy()
                 objects: list[dict] = []
                 n_auth = 0
                 n_intruders = 0
 
                 for idx, (face_id, bbox_px, det_score) in enumerate(tracked_ids):
                     x1, y1, x2, y2 = bbox_px
-                    fh, fw = frame.shape[:2]
+                    fh, fw = det_frame.shape[:2]
                     bx, by = max(0.0, x1), max(0.0, y1)
                     bw, bh = min(fw - bx, x2 - x1), min(fh - by, y2 - y1)
-                    
+
                     rec = recognizer.identify(faces[idx]["embedding"])
                     status = rec["status"]
                     is_auth = (status == "AUTHORIZED")
@@ -307,7 +444,11 @@ def run_webcam_pipeline(state: FacePipelineState = FACE_PIPELINE) -> None:
 
         finally:
             cap.release()
+        logger.info("[cam-06] Webcam stream ended — reopening")
 
+
+
+# ── Annotation ────────────────────────────────────────────────────────────────
 def _annotate_face(frame: np.ndarray, t: dict) -> None:
     x, y, w, h = (int(v) for v in t["bbox_px"])
     is_auth = t["is_auth"]
@@ -333,21 +474,26 @@ def _annotate_face(frame: np.ndarray, t: dict) -> None:
     cv2.rectangle(frame, (x, sy - 14), (x + sw + 8, sy + 2), color, 1)
     cv2.putText(frame, sub_tag, (x + 4, sy - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, cv2.LINE_AA)
 
+
+# ── Frame read helpers for /faces endpoints ───────────────────────────────────
 def latest_annotated() -> Optional[np.ndarray]:
     with FACE_PIPELINE.lock:
         f = FACE_PIPELINE.annotated
         return None if f is None else f.copy()
+
 
 def latest_raw() -> Optional[np.ndarray]:
     with FACE_PIPELINE.lock:
         f = FACE_PIPELINE.raw_frame
         return None if f is None else f.copy()
 
+
 def placeholder_frame(text: str) -> np.ndarray:
     w, h = FACE_PIPELINE.annotated_dims
     frame = np.zeros((h, w, 3), dtype=np.uint8)
     cv2.putText(frame, f"CAM-06 {text}", (40, h // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 128), 2)
     return frame
+
 
 def get_face_pipeline_state() -> dict:
     with FACE_PIPELINE.lock:
@@ -360,4 +506,3 @@ def get_face_pipeline_state() -> dict:
             "objects": list(FACE_PIPELINE.objects),
             "alerts": list(FACE_PIPELINE.alerts[:10]),
         }
-

@@ -4,13 +4,13 @@ export const kpiCards: KPICard[] = [
   {
     id: "active-cameras",
     label: "ACTIVE CAMERAS",
-    value: "7 / 7",
+    value: "6 / 6",
     iconName: "Camera",
     delta: "+0%",
     deltaType: "up",
     deltaLabel: "all operational",
     accentColor: "#3B82F6",
-    barData: [6, 6, 7, 7, 7, 7, 7],
+    barData: [6, 6, 6, 6, 6, 6, 6],
   },
   {
     id: "threat-events",

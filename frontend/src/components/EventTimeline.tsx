@@ -85,6 +85,7 @@ function TlRow({ ev, index, isLast }: { ev: TimelineEvent; index: number; isLast
 }
 
 export default function EventTimeline() {
+
   return (
     <div style={{
       background: "var(--panel)",

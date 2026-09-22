@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 from typing import List, Dict, Any, Tuple
-from config import settings
+from ...config import settings
 
 class PersonDetector:
     """

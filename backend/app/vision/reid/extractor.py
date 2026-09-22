@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from typing import List, Union
-from config import settings
+from ...config import settings
 
 class ReIDFeatureExtractor:
     """

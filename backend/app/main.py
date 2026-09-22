@@ -23,6 +23,10 @@ from .database.db_session import init_db
 from .hub import hub
 from .routes import routes_system, routes_vision, routes_reid, routes_query, routes_audio, routes_evidence
 
+import logging
+
+logger = logging.getLogger("bordereye.master")
+
 try:
     from .vision import face_pipeline
     from .vision.face_detector import FaceDetector
@@ -35,6 +39,7 @@ try:
         PIPELINES,
     )
 except Exception as e:
+    logger.error(f"Vision module import failed: {e}", exc_info=True)
     face_pipeline = None
     FaceDetector = None
     WatchlistManager = None
@@ -81,23 +86,19 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Failed to start camera pipelines: {e}")
 
-    # 3. Start CAM06 live webcam face pipeline in background
+    # 3. CAM06 face pipeline - DO NOT auto-start (slows down other inferences)
+    # User must manually start it via /faces/start endpoint when viewing CAM-06
     if face_pipeline:
-        try:
-            face_pipeline.set_broadcaster(
-                lambda payload: asyncio.run_coroutine_threadsafe(
-                    hub.broadcast_camera(face_pipeline.CAMERA_ID, payload), _loop
-                )
+        logger.info(f"[cam-06] face_pipeline module loaded successfully (NOT started)")
+        face_pipeline.set_broadcaster(
+            lambda payload: asyncio.run_coroutine_threadsafe(
+                hub.broadcast_camera(face_pipeline.CAMERA_ID, payload), _loop
             )
-            threading.Thread(
-                target=face_pipeline.run_webcam_pipeline,
-                args=(face_pipeline.FACE_PIPELINE,),
-                daemon=True,
-                name="cam-06-webcam",
-            ).start()
-            logger.info("[cam-06] Facial recognition webcam pipeline started")
-        except Exception as e:
-            logger.warning(f"[cam-06] Webcam pipeline notice: {e}")
+        )
+        # Thread reference stored for later start/stop
+        face_pipeline._camera_thread = None
+    else:
+        logger.warning("[cam-06] face_pipeline module NOT loaded - cam06 disabled")
 
     yield
     logger.info("Shutting down unified surveillance backend...")
@@ -352,11 +353,15 @@ async def reset_camera_fence(camera_id: str):
     return {"status": "cleared", "camera": camera_id}
 
 def _get_face_snapshot() -> tuple[bytes, bool]:
+    logger.info("[cam-06] HTTP snapshot request received")
     if face_pipeline:
+        logger.info("[cam-06] Calling face_pipeline.latest_annotated()")
         frame = face_pipeline.latest_annotated()
+        logger.info(f"[cam-06] Got frame: {type(frame)} {frame.shape if frame is not None else 'None'}")
         if frame is None:
             frame = face_pipeline.placeholder_frame("waiting for webcam")
         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        logger.info(f"[cam-06] Encoded JPEG: ok={ok}, size={len(buf) if ok else 0}")
         return (buf.tobytes() if ok else b""), getattr(face_pipeline.FACE_PIPELINE, "webcam", False)
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     cv2.putText(blank, "CAM-06 Facial Recognition Active", (80, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 128), 2)
@@ -386,6 +391,84 @@ async def faces_alerts():
     if face_pipeline:
         return {"camera": "cam-06", "alerts": list(face_pipeline.FACE_PIPELINE.alerts)}
     return {"camera": "cam-06", "alerts": []}
+
+@app.get("/faces/cameras")
+async def faces_cameras():
+    """Get list of available cameras for CAM-06."""
+    if face_pipeline:
+        cameras = face_pipeline.get_available_cameras()
+        current = face_pipeline.FACE_PIPELINE.selected_camera_index
+        return {"cameras": cameras, "current": current}
+    return {"cameras": [], "current": 0}
+
+@app.post("/faces/camera/set")
+async def faces_set_camera(data: dict):
+    """Set active camera for CAM-06."""
+    if face_pipeline:
+        index = data.get("index", 0)
+        result = face_pipeline.set_camera_index(index)
+        return result
+    return {"success": False, "error": "Face pipeline not available"}
+
+@app.post("/faces/start")
+async def faces_start():
+    """Start CAM-06 webcam pipeline (on-demand to avoid slowing other inferences)."""
+    if not face_pipeline:
+        return {"success": False, "error": "Face pipeline module not loaded"}
+    
+    # Check if already running
+    if hasattr(face_pipeline, '_camera_thread') and face_pipeline._camera_thread and face_pipeline._camera_thread.is_alive():
+        return {"success": True, "message": "CAM-06 already running", "status": "running"}
+    
+    # Reset stop flag and start thread
+    face_pipeline.FACE_PIPELINE.stop = False
+    face_pipeline._camera_thread = threading.Thread(
+        target=face_pipeline.run_webcam_pipeline,
+        args=(face_pipeline.FACE_PIPELINE,),
+        daemon=True,
+        name="cam-06-webcam",
+    )
+    face_pipeline._camera_thread.start()
+    logger.info("[cam-06] Webcam pipeline started on-demand")
+    return {"success": True, "message": "CAM-06 started", "status": "starting"}
+
+@app.post("/faces/stop")
+async def faces_stop():
+    """Stop CAM-06 webcam pipeline to free resources."""
+    if not face_pipeline:
+        return {"success": False, "error": "Face pipeline module not loaded"}
+    
+    # Set stop flag
+    face_pipeline.FACE_PIPELINE.stop = True
+    
+    # Wait briefly for thread to finish
+    if hasattr(face_pipeline, '_camera_thread') and face_pipeline._camera_thread:
+        face_pipeline._camera_thread.join(timeout=2.0)
+        face_pipeline._camera_thread = None
+    
+    logger.info("[cam-06] Webcam pipeline stopped")
+    return {"success": True, "message": "CAM-06 stopped", "status": "stopped"}
+
+@app.get("/faces/status")
+async def faces_status():
+    """Get CAM-06 pipeline status."""
+    if not face_pipeline:
+        return {"success": False, "running": False, "error": "Face pipeline module not loaded"}
+    
+    is_running = (
+        hasattr(face_pipeline, '_camera_thread') 
+        and face_pipeline._camera_thread 
+        and face_pipeline._camera_thread.is_alive()
+        and not face_pipeline.FACE_PIPELINE.stop
+    )
+    
+    return {
+        "success": True,
+        "running": is_running,
+        "webcam": face_pipeline.FACE_PIPELINE.webcam,
+        "frames_read": face_pipeline.FACE_PIPELINE.frames_read,
+        "camera_index": face_pipeline.FACE_PIPELINE.selected_camera_index,
+    }
 
 # ── Real-Time WebSockets ─────────────────────────────────────────────────────
 @app.websocket("/ws/analytics")

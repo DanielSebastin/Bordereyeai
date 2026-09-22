@@ -2,6 +2,24 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# ---------------------------------------------------------------------------
+# GPU auto-detect (FIX 7 / FIX 13)
+# We probe torch once here so that every module can read settings.USE_GPU
+# instead of calling torch.cuda.is_available() in multiple places.
+# ---------------------------------------------------------------------------
+def _detect_gpu() -> bool:
+    try:
+        import torch
+        available = torch.cuda.is_available()
+        if available:
+            print("[config] CUDA GPU detected — ANPR / YOLO will use GPU.", flush=True)
+        else:
+            print("[config] No CUDA GPU — running on CPU.", flush=True)
+        return available
+    except Exception:
+        print("[config] torch not importable — CPU mode.", flush=True)
+        return False
+
 APP_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = APP_DIR.parent
 ROOT_DIR = BACKEND_DIR.parent
@@ -24,9 +42,19 @@ class UnifiedSettings:
     PUBLIC_DIR: Path = ROOT_DIR / 'public'
     
     YOLO_MODEL_PATH: str = os.getenv('YOLO_MODEL_PATH', str(WEIGHTS_DIR / 'yolo11n.pt'))
-    DEVICE: str = os.getenv('DEVICE', 'cpu')
+    # Path to the dedicated YOLO model for license plate detection
+    LICENSE_PLATE_DETECTOR_PATH: str = os.getenv(
+        'LICENSE_PLATE_DETECTOR_PATH', 
+        str(BACKEND_DIR / 'models' / 'license_plate_detector.pt')
+    )
+    DEVICE: str = os.getenv('DEVICE', 'cuda' if _detect_gpu() else 'cpu')
     ANPR_OCR: str = os.getenv('ANPR_OCR', 'rapidocr')
-    EASYOCR_MODULE_PATH: str = os.getenv('EASYOCR_MODULE_PATH', r'D:\easyocr-models')
+    # FIX 13: default to ~/.easyocr so it works on Linux / Docker / macOS as well.
+    # Set EASYOCR_MODULE_PATH env var to override (e.g. a fast local SSD path).
+    EASYOCR_MODULE_PATH: str = os.getenv(
+        'EASYOCR_MODULE_PATH',
+        str(Path.home() / '.easyocr')
+    )
     WATCHLIST_PATH: str = os.getenv('WATCHLIST_PATH', str(DATA_DIR / 'watchlist'))
     
     REID_SIMILARITY_THRESHOLD: float = float(os.getenv('REID_SIMILARITY_THRESHOLD', '0.72'))
@@ -54,6 +82,24 @@ class UnifiedSettings:
     HOST: str = os.getenv('HOST', '0.0.0.0')
     PORT: int = int(os.getenv('PORT', '8000'))
     DEBUG: bool = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+    # ── ANPR / OCR settings (FIX 1, 7, 12, 13) ─────────────────────────────
+    # USE_GPU: resolved once at import time via torch probe above.
+    USE_GPU: bool = _detect_gpu()
+
+    # Maximum items in the ANPRWorker OCR queue before oldest are dropped.
+    # Keeps memory bounded under sustained load (FIX 12).
+    ANPR_OCR_QUEUE_MAXSIZE: int = int(os.getenv('ANPR_OCR_QUEUE_MAXSIZE', '8'))
+
+    # Portable YOLO weight search order (FIX 13).
+    # Populated at class-body evaluation time so Path expressions are valid.
+    YOLO_WEIGHT_CANDIDATES: tuple = (
+        Path(os.getenv('YOLO_MODEL_PATH', str(BACKEND_DIR / 'weights' / 'yolo11n.pt'))),
+        BACKEND_DIR / 'weights' / 'yolo11n.pt',
+        ROOT_DIR / 'yolo11n.pt',
+        Path('yolo11n.pt'),
+        Path.home() / '.cache' / 'ultralytics' / 'yolo11n.pt',
+    )
 
     def ensure_directories(self):
         for d in [self.DATA_DIR, self.CROPS_DIR, self.AUDIO_EVIDENCE_DIR, self.VECTOR_DB_DIR, self.WEIGHTS_DIR]:

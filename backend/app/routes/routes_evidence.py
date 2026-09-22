@@ -162,13 +162,65 @@ def create_evidence(req: EvidenceCreateRequest):
 
 @router.get("/list")
 def list_evidence():
+    """Fetch evidence from both JSON store and database"""
     with _LOCK:
+        # Get JSON-stored evidence
         items = _load_evidence_list()
+        
+        # Also fetch from database
+        try:
+            from ..database.db_session import SessionLocal
+            from ..database.models import SurveillanceEvent
+            
+            db = SessionLocal()
+            try:
+                # Fetch recent surveillance events
+                db_events = db.query(SurveillanceEvent).order_by(
+                    SurveillanceEvent.timestamp.desc()
+                ).limit(50).all()
+                
+                # Convert database events to evidence format
+                for event in db_events:
+                    snapshot_url = None
+                    snapshot_base64 = None
+                    hash_sha256 = None
+                    
+                    if event.metadata_json:
+                        snapshot_url = event.metadata_json.get("snapshot_url")
+                        snapshot_base64 = event.metadata_json.get("snapshot_base64")
+                        hash_sha256 = event.metadata_json.get("hash_sha256")
+                    
+                    # Only add if we have a snapshot
+                    if snapshot_url or snapshot_base64:
+                        ev_item = {
+                            "id": f"DB-{event.id}",
+                            "title": f"{event.event_type.replace('_', ' ').title()} - {event.camera_id.upper()}",
+                            "camera_id": event.camera_id.upper(),
+                            "timestamp": event.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                            "incident_type": event.event_type.replace('_', ' ').title(),
+                            "severity": event.severity,
+                            "officer": event.metadata_json.get("officer", "AI_OPERATOR") if event.metadata_json else "AI_OPERATOR",
+                            "notes": event.description,
+                            "snapshot_url": snapshot_url,
+                            "snapshot_base64": snapshot_base64,
+                            "hash_sha256": hash_sha256,
+                            "status": "SECURED & SEALED",
+                        }
+                        items.append(ev_item)
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.warning(f"Failed to fetch database evidence: {e}")
+        
+        # Seed with defaults if empty
         if not items:
             seed_1 = store_evidence_item("CAM-04", "Virtual Fence Perimeter Intrusion", "critical", "MAJOR PRAVEEN", "Intruder approached virtual fence sector 4 polygon.")
             seed_2 = store_evidence_item("CAM-02", "ANPR High-Speed Plate Capture", "medium", "MAJOR PRAVEEN", "RapidOCR recognized vehicle plate TN11AA1234.")
             seed_3 = store_evidence_item("CAM-06", "Biometric Checkpoint Access Authorization", "low", "MAJOR PRAVEEN", "Authorized commander verified with FaceNet 512-d biometrics.")
             items = [seed_1, seed_2, seed_3]
+        
         return {"total": len(items), "evidence": items}
 
 @router.get("/{evidence_id}")

@@ -9,9 +9,9 @@
 tracker_type: bytetrack
 
 # Detection thresholds
-track_high_thresh: 0.6    # High confidence threshold (default: 0.5)
-track_low_thresh: 0.2     # Low confidence threshold for track continuation (default: 0.1)  
-new_track_thresh: 0.7     # Threshold for creating new tracks (default: 0.6)
+track_high_thresh: 0.5    # High confidence threshold (default: 0.5)
+track_low_thresh: 0.1     # Low confidence threshold for track continuation (default: 0.1)  
+new_track_thresh: 0.5     # Threshold for creating new tracks (default: 0.6)
 
 # Tracking parameters
 track_buffer: 60          # Frames to keep lost tracks (default: 30)

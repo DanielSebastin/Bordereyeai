@@ -22,6 +22,7 @@ import {
   UserCheck,
   Volume2,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { BACKEND_URL } from "@/lib/detectionStream";
 
 interface Feature12QueryEngineProps {
@@ -49,32 +50,17 @@ export default function Feature12QueryEngine({
 }: Feature12QueryEngineProps) {
   const [mode, setMode] = useState<"surveillance" | "video">(initialMode);
   const [query, setQuery] = useState(defaultQuery);
-  const [selectedCam, setSelectedCam] = useState("all");
   const [videoFile, setVideoFile] = useState("cam2.mp4");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any | null>(null);
-  const [liveTelemetry, setLiveTelemetry] = useState<any | null>(null);
+  
+  // Changed from single result to array of messages
+  const [messages, setMessages] = useState<Array<{role: "user" | "assistant", content: string, error?: boolean}>>([]);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
-  // Poll live telemetry
   useEffect(() => {
-    let mounted = true;
-    const fetchLive = async () => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/query/live`);
-        if (res.ok && mounted) {
-          const data = await res.json();
-          setLiveTelemetry(data);
-        }
-      } catch (e) {}
-    };
-    fetchLive();
-    const interval = setInterval(fetchLive, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   const sampleSurveillanceQueries = [
     "Find unauthorized intrusions across Sector 4 in the last 24 hours",
@@ -83,20 +69,15 @@ export default function Feature12QueryEngine({
     "Summarize all high-severity threats and fence violations",
   ];
 
-  const sampleVideoQuestions = [
-    "What vehicles were detected in this video feed?",
-    "Were any license plates recognized?",
-    "Did anyone approach or cross the virtual fence line?",
-    "Give me an executive forensic breakdown of visual activity in this footage.",
-  ];
-
   const handleAsk = async (queryText?: string) => {
     const textToSubmit = queryText || query;
     if (!textToSubmit.trim()) return;
 
+    // Add user message to history
+    setMessages((prev) => [...prev, { role: "user", content: textToSubmit.trim() }]);
+    setQuery("");
     setLoading(true);
     setError(null);
-    setResult(null);
 
     try {
       if (mode === "surveillance") {
@@ -112,27 +93,11 @@ export default function Feature12QueryEngine({
         }
 
         const data = await res.json();
-        setResult({ type: "surveillance", ...data });
-      } else {
-        const res = await fetch(`${BACKEND_URL}/api/v1/video/ask`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            video_filename: videoFile,
-            question: textToSubmit.trim(),
-          }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || "Video analysis query failed");
-        }
-
-        const data = await res.json();
-        setResult({ type: "video", ...data });
+        setMessages((prev) => [...prev, { role: "assistant", content: data.response || data.ai_answer || "No text synthesis generated." }]);
       }
     } catch (err: any) {
       setError(err.message || "Failed to reach AI Query Engine");
+      setMessages((prev) => [...prev, { role: "assistant", content: err.message || "Failed to reach AI Query Engine", error: true }]);
     } finally {
       setLoading(false);
     }
@@ -149,6 +114,7 @@ export default function Feature12QueryEngine({
         display: "flex",
         flexDirection: "column",
         gap: 0,
+        height: "100%", // Take up full height
       }}
     >
       {/* Header */}
@@ -162,6 +128,7 @@ export default function Feature12QueryEngine({
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: 8,
+          flexShrink: 0,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -184,405 +151,198 @@ export default function Feature12QueryEngine({
               {title}
             </div>
             <div style={{ fontSize: 9.5, color: "var(--text-muted)" }}>
-              Multi-Source RAG · Text-to-SQL · Visual Forensics · Cross-Camera Intelligence
+              Natural language intelligence briefing interface
             </div>
           </div>
-        </div>
-
-        {/* Mode Selector */}
-        <div
-          style={{
-            display: "flex",
-            background: "#FFFFFF",
-            padding: 3,
-            borderRadius: "var(--r)",
-            border: "1px solid var(--border)",
-            gap: 4,
-          }}
-        >
-          <button
-            onClick={() => {
-              setMode("surveillance");
-              setResult(null);
-            }}
-            style={{
-              padding: "4px 10px",
-              fontSize: 9.5,
-              fontWeight: 700,
-              borderRadius: "var(--r)",
-              border: "1px solid",
-              borderColor: mode === "surveillance" ? "var(--navy)" : "transparent",
-              cursor: "pointer",
-              background: mode === "surveillance" ? "var(--navy-lt)" : "transparent",
-              color: mode === "surveillance" ? "var(--navy)" : "var(--text-muted)",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <Database size={11} /> Multi-Camera RAG
-          </button>
-          <button
-            onClick={() => {
-              setMode("video");
-              setResult(null);
-            }}
-            style={{
-              padding: "4px 10px",
-              fontSize: 9.5,
-              fontWeight: 700,
-              borderRadius: "var(--r)",
-              border: "1px solid",
-              borderColor: mode === "video" ? "var(--navy)" : "transparent",
-              cursor: "pointer",
-              background: mode === "video" ? "var(--navy-lt)" : "transparent",
-              color: mode === "video" ? "var(--navy)" : "var(--text-muted)",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <Video size={11} /> Video Forensics Q&A
-          </button>
         </div>
       </div>
 
-      {/* Camera Target Selector (Surveillance Mode) */}
-      {mode === "surveillance" && (
-        <div
-          style={{
-            padding: "6px 12px",
-            background: "#F4F6FB",
-            borderBottom: "1px solid var(--border-lt)",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            overflowX: "auto",
-          }}
-        >
-          <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-            Target Feed:
-          </span>
-          {CAMERAS.map((c) => {
-            const active = selectedCam === c.id;
-            const Icon = c.icon;
-            return (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setSelectedCam(c.id);
-                  if (c.id !== "all") {
-                    setQuery(c.queryPrefix);
-                  } else {
-                    setQuery("What is happening across all live cameras right now?");
-                  }
-                }}
-                style={{
-                  padding: "3px 9px",
-                  borderRadius: "var(--r)",
-                  fontSize: 9,
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  cursor: "pointer",
-                  border: `1px solid ${active ? "var(--navy)" : "var(--border)"}`,
-                  background: active ? "var(--navy)" : "#FFFFFF",
-                  color: active ? "#FFFFFF" : "var(--text-2)",
-                  transition: "all 0.15s",
-                }}
-              >
-                <Icon size={11} />
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Query Bar */}
-      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {mode === "video" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--navy)", letterSpacing: "0.04em" }}>
-              TARGET VIDEO:
-            </span>
-            <select
-              value={videoFile}
-              onChange={(e) => setVideoFile(e.target.value)}
-              style={{
-                padding: "4px 10px",
-                background: "#FFFFFF",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--r)",
-                color: "var(--text)",
-                fontSize: 10,
-                fontWeight: 600,
-                outline: "none",
-              }}
-            >
-              <option value="cam1.mp4">CAM-01 (Human ByteTrack Footage)</option>
-              <option value="cam2.mp4">CAM-02 (Vehicle ANPR & Highway Footage)</option>
-              <option value="cam4.mp4">CAM-04 (Virtual Fence Perimeter Footage)</option>
-              <option value="cam5.mp4">CAM-05 (Sector Surveillance Footage)</option>
-            </select>
+      {/* Message History Area */}
+      <div 
+        style={{ 
+          flex: 1, 
+          overflowY: "auto", 
+          padding: "20px", 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: "16px" 
+        }}
+      >
+        {messages.length === 0 && (
+          <div style={{ margin: "auto", textAlign: "center", color: "var(--text-muted)" }}>
+            <Bot size={40} style={{ margin: "0 auto 12px", opacity: 0.2 }} />
+            <p>How can I help you with BorderEye Intelligence today?</p>
           </div>
         )}
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <input
-              type="text"
-              placeholder={
-                mode === "surveillance"
-                  ? "Ask any question about any camera in real-time (e.g. 'What is happening on CAM-04 right now?', 'Who is on CAM-06?')..."
-                  : "Ask a question about this video (e.g. 'Were any red trucks or ANPR plates observed?')..."
-              }
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAsk();
-              }}
-              style={{
-                width: "100%",
-                padding: "8px 12px 8px 34px",
-                background: "#FFFFFF",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--r)",
-                color: "var(--text)",
-                fontSize: 11,
-                outline: "none",
-              }}
-            />
-            <Search
-              size={14}
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--text-muted)",
-              }}
-            />
-          </div>
-          <button
-            onClick={() => handleAsk()}
-            disabled={loading || !query.trim()}
+        
+        {messages.map((msg, idx) => (
+          <div 
+            key={idx} 
             style={{
-              padding: "0 18px",
-              background: "var(--navy)",
-              border: "none",
-              borderRadius: "var(--r)",
-              color: "#FFFFFF",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: loading || !query.trim() ? "not-allowed" : "pointer",
               display: "flex",
-              alignItems: "center",
-              gap: 6,
-              opacity: loading || !query.trim() ? 0.6 : 1,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+              justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+              width: "100%",
+              maxWidth: "850px", // Constrain the chat flow width
+              margin: "0 auto", // Center the message block horizontally
             }}
           >
-            {loading ? <Sparkles size={12} className="animate-spin" /> : <Send size={12} />}
-            {loading ? "Analyzing..." : "Ask AI"}
-          </button>
-        </div>
-
-        {/* Quick Suggestion Chips */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 8.5, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.06em" }}>
-            SUGGESTED:
-          </span>
-          {(mode === "surveillance" ? sampleSurveillanceQueries : sampleVideoQuestions).map(
-            (sample, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setQuery(sample);
-                  handleAsk(sample);
-                }}
-                style={{
-                  padding: "3px 8px",
-                  background: "#F4F6FB",
-                  border: "1px solid var(--border-lt)",
-                  borderRadius: "var(--r)",
-                  fontSize: 8.5,
-                  fontWeight: 600,
-                  color: "var(--navy)",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--navy-lt)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#F4F6FB";
-                }}
-              >
-                {sample}
-              </button>
-            )
-          )}
-        </div>
-
-        {/* Error Notification */}
-        {error && (
-          <div
-            style={{
-              padding: "8px 12px",
-              background: "var(--crit-lt)",
-              border: "1px solid var(--crit-bd)",
-              borderRadius: "var(--r)",
-              color: "var(--crit)",
-              fontSize: 11,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <AlertCircle size={14} style={{ flexShrink: 0 }} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Response Box */}
-        {result && (
-          <div
-            style={{
-              marginTop: 6,
-              padding: "14px",
-              background: "#FFFFFF",
-              border: "1px solid var(--border)",
-              borderLeft: "4px solid var(--navy)",
-              borderRadius: "var(--r)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              boxShadow: "var(--sh)",
-            }}
-          >
-            {/* Header info */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Bot size={15} style={{ color: "var(--navy)" }} />
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--navy)", letterSpacing: "0.04em" }}>
-                  AI SURVEILLANCE INTELLIGENCE BRIEF
-                </span>
-                {result.intent && (
-                  <span
-                    style={{
-                      padding: "2px 7px",
-                      borderRadius: "var(--r)",
-                      background: "var(--navy-lt)",
-                      color: "var(--navy)",
-                      fontSize: 8.5,
-                      fontWeight: 700,
-                      fontFamily: "var(--mono)",
-                      border: "1px solid var(--border)",
-                    }}
-                  >
-                    INTENT: {result.intent}
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: 8.5, color: "var(--text-muted)", fontFamily: "var(--mono)" }}>
-                Engine: {result.llm_provider || "Unified RAG Engine"}
-              </span>
-            </div>
-
-            {/* Response markdown text */}
             <div
               style={{
-                fontSize: 11.5,
-                color: "var(--text)",
-                lineHeight: 1.6,
-                background: "#F4F6FB",
-                padding: "12px 14px",
-                borderRadius: "var(--r)",
-                border: "1px solid var(--border-lt)",
-                whiteSpace: "pre-wrap",
-                fontFamily: "inherit",
+                maxWidth: "800px", // ChatGPT-like max width
+                width: "fit-content",
+                padding: "16px",
+                background: msg.role === "user" ? "var(--navy)" : (msg.error ? "var(--crit-lt)" : "#F4F6FB"),
+                color: msg.role === "user" ? "#FFFFFF" : (msg.error ? "var(--crit)" : "var(--text)"),
+                border: msg.role === "assistant" ? "1px solid var(--border-lt)" : "none",
+                borderRadius: "12px",
+                borderBottomRightRadius: msg.role === "user" ? "4px" : "12px",
+                borderBottomLeftRadius: msg.role === "assistant" ? "4px" : "12px",
+                boxShadow: msg.role === "assistant" ? "0 2px 8px rgba(0,0,0,0.02)" : "none",
               }}
             >
-              {result.response || result.ai_answer || "No text synthesis generated."}
+              {msg.role === "user" ? (
+                <div style={{ fontSize: 14 }}>{msg.content}</div>
+              ) : (
+                <div
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    fontFamily: "inherit",
+                    whiteSpace: "pre-wrap", // Preserve single newlines as line breaks
+                  }}
+                  className="prose prose-sm max-w-none"
+                >
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              )}
             </div>
-
-            {/* Visual Telemetry / SQL Breakdown */}
-            {result.visual_telemetry && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <div
-                  style={{
-                    padding: "4px 9px",
-                    borderRadius: "var(--r)",
-                    background: "var(--green-lt)",
-                    border: "1px solid var(--low-bd)",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "var(--green)",
-                  }}
-                >
-                  Frames Analyzed: {result.visual_telemetry.total_frames_analyzed ?? 0}
-                </div>
-                <div
-                  style={{
-                    padding: "4px 9px",
-                    borderRadius: "var(--r)",
-                    background: "var(--navy-lt)",
-                    border: "1px solid var(--border)",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "var(--navy)",
-                  }}
-                >
-                  Detections: {result.visual_telemetry.total_detections ?? 0}
-                </div>
-                {result.visual_telemetry.plates_found?.length > 0 && (
-                  <div
-                    style={{
-                      padding: "4px 9px",
-                      borderRadius: "var(--r)",
-                      background: "var(--high-lt)",
-                      border: "1px solid var(--high-bd)",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "var(--high)",
-                      fontFamily: "var(--mono)",
-                    }}
-                  >
-                    Plates: {result.visual_telemetry.plates_found.join(", ")}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {result.generated_sql && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 8.5,
-                  color: "var(--text-muted)",
-                  fontFamily: "var(--mono)",
-                  background: "#F4F6FB",
-                  padding: "6px 10px",
-                  borderRadius: "var(--r)",
-                  border: "1px solid var(--border-lt)",
-                }}
-              >
-                <Terminal size={10} style={{ color: "var(--navy)" }} />
-                <span>SQL Executed: {result.generated_sql}</span>
-                <span style={{ marginLeft: "auto", color: "var(--navy)", fontWeight: 700 }}>
-                  ({result.sql_results_count ?? 0} hits)
-                </span>
-              </div>
-            )}
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display: "flex", justifyContent: "flex-start", width: "100%", maxWidth: "850px", margin: "0 auto" }}>
+             <div
+              style={{
+                maxWidth: "800px",
+                width: "fit-content",
+                padding: "16px",
+                background: "#F4F6FB",
+                border: "1px solid var(--border-lt)",
+                borderRadius: "12px",
+                borderBottomLeftRadius: "4px",
+                color: "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Sparkles size={14} className="animate-spin" /> Analyzing feeds...
+            </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Bottom Input Area */}
+      <div 
+        style={{ 
+          padding: "16px", 
+          borderTop: "1px solid var(--border)",
+          background: "#FFFFFF",
+          flexShrink: 0
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: "900px", margin: "0 auto" }}>
+          
+          {/* Quick Suggestion Chips */}
+          {messages.length === 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 8 }}>
+              {sampleSurveillanceQueries.map((sample, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    handleAsk(sample);
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    background: "#F4F6FB",
+                    border: "1px solid var(--border-lt)",
+                    borderRadius: "100px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--navy)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--navy-lt)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F4F6FB";
+                  }}
+                >
+                  {sample}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Message BorderEye AI..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAsk();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "14px 16px 14px 44px",
+                  background: "#F9FAFB",
+                  border: "1px solid var(--border)",
+                  borderRadius: "24px",
+                  color: "var(--text)",
+                  fontSize: 14,
+                  outline: "none",
+                  boxShadow: "inset 0 1px 2px rgba(0,0,0,0.02)",
+                }}
+              />
+              <Search
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: 16,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--text-muted)",
+                }}
+              />
+            </div>
+            <button
+              onClick={() => handleAsk()}
+              disabled={loading || !query.trim()}
+              style={{
+                width: "50px",
+                height: "50px",
+                borderRadius: "50%",
+                background: "var(--navy)",
+                border: "none",
+                color: "#FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: loading || !query.trim() ? "not-allowed" : "pointer",
+                opacity: loading || !query.trim() ? 0.6 : 1,
+                boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                flexShrink: 0,
+              }}
+            >
+              <Send size={18} style={{ marginLeft: -2 }} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

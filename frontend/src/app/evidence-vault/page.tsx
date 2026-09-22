@@ -99,11 +99,11 @@ export default function EvidenceVaultPage() {
   const filteredItems = evidenceList.filter((item) => {
     const matchesSearch =
       !searchQuery ||
-      item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.camera_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sha256_hash.toLowerCase().includes(searchQuery.toLowerCase());
+      item.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.camera_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.sha256_hash?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCam = selectedCamera === "ALL" || item.camera_id === selectedCamera;
     const matchesSev = selectedSeverity === "ALL" || item.severity === selectedSeverity.toLowerCase();
@@ -650,7 +650,7 @@ export default function EvidenceVaultPage() {
                       }}
                     >
                       <Key size={9} style={{ color: "#003380" }} />
-                      <span>SHA-256: {item.sha256_hash.slice(0, 18)}...</span>
+                      <span>SHA-256: {item.sha256_hash ? item.sha256_hash.slice(0, 18) : 'N/A'}...</span>
                     </div>
                   </div>
 

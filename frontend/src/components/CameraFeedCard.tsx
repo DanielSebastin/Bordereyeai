@@ -1033,6 +1033,77 @@ export default function CameraFeedCard({
   const liveObjects = liveFrame?.objects ?? [];
   const fenceOverlayRef = useRef<HTMLDivElement>(null);
 
+  // ── CAM-06 camera selection & on/off control ──
+  const [availableCameras, setAvailableCameras] = useState<Array<{index: number, name: string, resolution: string}>>([]);
+  const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
+  const [showCameraSelector, setShowCameraSelector] = useState(false);
+  const [loadingCameras, setLoadingCameras] = useState(false);
+  const [cam06Running, setCam06Running] = useState(false);
+  const [cam06Toggling, setCam06Toggling] = useState(false);
+
+  // Fetch CAM-06 status when expanded
+  useEffect(() => {
+    if (isFaceCam && expanded) {
+      fetch("http://localhost:8000/faces/status")
+        .then(res => res.json())
+        .then(data => {
+          setCam06Running(data.running || false);
+        })
+        .catch(err => console.error("Failed to fetch CAM-06 status:", err));
+    }
+  }, [isFaceCam, expanded]);
+
+  // Fetch available cameras when CAM-06 is expanded
+  useEffect(() => {
+    if (isFaceCam && expanded && cam06Running) {
+      setLoadingCameras(true);
+      fetch("http://localhost:8000/faces/cameras")
+        .then(res => res.json())
+        .then(data => {
+          setAvailableCameras(data.cameras || []);
+          setCurrentCameraIndex(data.current || 0);
+          setLoadingCameras(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch cameras:", err);
+          setLoadingCameras(false);
+        });
+    }
+  }, [isFaceCam, expanded, cam06Running]);
+
+  const toggleCam06 = async () => {
+    setCam06Toggling(true);
+    try {
+      const endpoint = cam06Running ? "/faces/stop" : "/faces/start";
+      const res = await fetch(`http://localhost:8000${endpoint}`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setCam06Running(!cam06Running);
+      }
+    } catch (err) {
+      console.error("Failed to toggle CAM-06:", err);
+    } finally {
+      setCam06Toggling(false);
+    }
+  };
+
+  const handleCameraChange = async (index: number) => {
+    try {
+      const res = await fetch("http://localhost:8000/faces/camera/set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCurrentCameraIndex(index);
+        setShowCameraSelector(false);
+      }
+    } catch (err) {
+      console.error("Failed to set camera:", err);
+    }
+  };
+
   // ── cam-04 virtual fence drawing ──
   const [drawFence, setDrawFence] = useState(false);
   const [drawPoints, setDrawPoints] = useState<FencePoint[]>([]);
@@ -1230,32 +1301,6 @@ export default function CameraFeedCard({
               background: "#000",
             }}
           />
-          {feed.status === "live" && !liveFrame && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: "none",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 8,
-                  fontWeight: 700,
-                  color: "#7A94AC",
-                  letterSpacing: "0.14em",
-                  background: "rgba(0,0,0,0.72)",
-                  padding: "2px 6px",
-                  borderRadius: 3,
-                }}
-              >
-                CONNECTING WEBCAM…
-              </span>
-            </div>
-          )}
         </div>
       ) : (
         <div style={{ position: "absolute", inset: 0, background: "#050B13" }}>
@@ -1600,6 +1645,159 @@ export default function CameraFeedCard({
             <Maximize2 size={10} style={{ color: "#fff" }} />
           )}
         </button>
+      )}
+
+      {/* CAM-06 ON/OFF Toggle Button (only when expanded) */}
+      {isFaceCam && expanded && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleCam06();
+          }}
+          disabled={cam06Toggling}
+          title={cam06Running ? "Stop CAM-06 (frees resources)" : "Start CAM-06 webcam"}
+          style={{
+            position: "absolute",
+            bottom: 26,
+            right: 350,
+            padding: "4px 10px",
+            fontSize: 9,
+            borderRadius: 4,
+            background: cam06Running 
+              ? "rgba(16,185,129,0.5)" 
+              : "rgba(239,68,68,0.5)",
+            border: `1px solid ${cam06Running ? "rgba(16,185,129,0.6)" : "rgba(239,68,68,0.6)"}`,
+            color: "#fff",
+            cursor: cam06Toggling ? "wait" : "pointer",
+            zIndex: 7,
+            transition: "all 0.15s",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            opacity: cam06Toggling ? 0.6 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (!cam06Toggling) {
+              e.currentTarget.style.background = cam06Running 
+                ? "rgba(16,185,129,0.65)" 
+                : "rgba(239,68,68,0.65)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!cam06Toggling) {
+              e.currentTarget.style.background = cam06Running 
+                ? "rgba(16,185,129,0.5)" 
+                : "rgba(239,68,68,0.5)";
+            }
+          }}
+        >
+          {cam06Toggling ? "⏳" : (cam06Running ? "● ON" : "○ OFF")}
+        </button>
+      )}
+
+      {/* CAM-06 Camera Selector Button (only when expanded and running) */}
+      {isFaceCam && expanded && cam06Running && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowCameraSelector(!showCameraSelector);
+          }}
+          title="Select Camera Source"
+          style={{
+            position: "absolute",
+            bottom: 26,
+            right: 230,
+            padding: "4px 8px",
+            fontSize: 9,
+            borderRadius: 4,
+            background: showCameraSelector ? "rgba(59,130,246,0.5)" : "rgba(0,0,0,0.65)",
+            border: "1px solid rgba(255,255,255,0.22)",
+            color: "#fff",
+            cursor: "pointer",
+            zIndex: 7,
+            transition: "background 0.15s",
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+          onMouseEnter={(e) => {
+            if (!showCameraSelector) e.currentTarget.style.background = "rgba(59,130,246,0.35)";
+          }}
+          onMouseLeave={(e) => {
+            if (!showCameraSelector) e.currentTarget.style.background = "rgba(0,0,0,0.65)";
+          }}
+        >
+          📷 Camera {currentCameraIndex}
+        </button>
+      )}
+
+      {/* CAM-06 Camera Selector Dropdown (only when running) */}
+      {isFaceCam && expanded && cam06Running && showCameraSelector && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 52,
+            right: 230,
+            background: "rgba(15,23,42,0.98)",
+            border: "1px solid rgba(59,130,246,0.4)",
+            borderRadius: 6,
+            padding: 8,
+            zIndex: 8,
+            minWidth: 180,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#93C5FD", marginBottom: 6, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+            Select Camera Source
+          </div>
+          {loadingCameras ? (
+            <div style={{ fontSize: 9, color: "#94A3B8", padding: 6 }}>Loading cameras...</div>
+          ) : availableCameras.length === 0 ? (
+            <div style={{ fontSize: 9, color: "#F87171", padding: 6 }}>No cameras detected</div>
+          ) : (
+            availableCameras.map((cam) => (
+              <button
+                key={cam.index}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCameraChange(cam.index);
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "6px 8px",
+                  fontSize: 9,
+                  background: currentCameraIndex === cam.index ? "rgba(59,130,246,0.3)" : "transparent",
+                  border: currentCameraIndex === cam.index ? "1px solid rgba(59,130,246,0.6)" : "1px solid transparent",
+                  borderRadius: 4,
+                  color: "#fff",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  marginBottom: 4,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  if (currentCameraIndex !== cam.index) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (currentCameraIndex !== cam.index) {
+                    e.currentTarget.style.background = "transparent";
+                  }
+                }}
+              >
+                <div style={{ fontWeight: 600, color: currentCameraIndex === cam.index ? "#60A5FA" : "#E2E8F0" }}>
+                  📷 {cam.name}
+                  {currentCameraIndex === cam.index && " ✓"}
+                </div>
+                <div style={{ fontSize: 8, color: "#94A3B8", marginTop: 2 }}>{cam.resolution}</div>
+              </button>
+            ))
+          )}
+        </div>
       )}
 
       {/* Video pane */}

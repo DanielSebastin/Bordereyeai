@@ -3,11 +3,11 @@
 import type { TrendPoint } from "@/lib/threatIntelligenceData";
 import { useMeasure } from "./chartUtils";
 
-export const TREND_SERIES: { key: "intrusions" | "suspicious" | "watchlist" | "vehicles"; label: string; color: string }[] = [
-  { key: "intrusions", label: "Intrusions", color: "#EF4444" },
-  { key: "suspicious", label: "Suspicious Activities", color: "#F97316" },
-  { key: "watchlist", label: "Watchlist Matches", color: "#3B82F6" },
-  { key: "vehicles", label: "Vehicle Violations", color: "#EAB308" },
+export const TREND_SERIES: { key: "critical" | "high" | "medium" | "low"; label: string; color: string }[] = [
+  { key: "critical", label: "Critical", color: "#EF4444" },
+  { key: "high", label: "High", color: "#F97316" },
+  { key: "medium", label: "Medium", color: "#3B82F6" },
+  { key: "low", label: "Low", color: "#EAB308" },
 ];
 
 interface TrendChartProps {
@@ -110,7 +110,7 @@ export default function TrendChart({ data }: TrendChartProps) {
                   fontFamily="var(--mono)"
                   fontWeight={600}
                 >
-                  {d.label}
+                  {d.time}
                 </text>
               ) : null
             )}

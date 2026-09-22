@@ -33,7 +33,9 @@ export interface StreamObject {
   confidence: number;
   bbox: [number, number, number, number]; // [x, y, w, h] normalized 0..1
   reid_id?: string;
-  plate_text?: string;
+  plate?: string;              // ← ANPR license plate number
+  plate_text?: string;         // ← Alternative field name
+  track_id?: number;           // ← Tracking ID
   watchlist?: boolean;
   status?: string;
   designation?: string;

@@ -1,8 +1,8 @@
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
-from database.models import GlobalPerson, PersonSighting
-from config import settings
+from ...database.models import GlobalPerson, PersonSighting
+from ...config import settings
 
 class CrossCameraMatcher:
     """

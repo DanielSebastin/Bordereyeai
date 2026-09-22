@@ -30,7 +30,7 @@ deployment/
 *.pem
 *.key
 
-# Large Media files (>10MB / CCTV recordings)
+# Large Media files (CCTV recordings / binary blobs)
 *.mp4
 *.mp4.zip
 *.zip
@@ -43,18 +43,12 @@ deployment/
 *.mp3
 *.wav
 
-# Whitelist web-optimized camera videos only at root and frontend/public/
-frontend/public/recordings/*.mp4
+# Whitelist web-optimized camera videos only at frontend/public/
 !/frontend/public/cam1.mp4
 !/frontend/public/cam2.mp4
 !/frontend/public/cam3.mp4
 !/frontend/public/cam4.mp4
 !/frontend/public/cam5.mp4
-!/cam1.mp4
-!/cam2.mp4
-!/cam3.mp4
-!/cam4.mp4
-!/cam5.mp4
 
 # Model weights
 *.pt
@@ -65,7 +59,6 @@ frontend/public/recordings/*.mp4
 *.pkl
 
 # SQLite databases & cache
-surveillance.db
 *.db
 *.sqlite3
 data/embeddings/
@@ -80,3 +73,28 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Pip / build output logs
+pip_out.txt
+build_log.txt
+
+# Scratch / local-only images
+*.jpeg
+*.jpg
+*.png
+ia.jpg
+
+# Nested sub-repos / third-party clones (not part of this project)
+IVBAP_repo/
+Audio_17_18_repo/
+backend/app/vision/automatic-number-plate-recognition-python-yolov8/
+
+# Snapshots generated at runtime
+frontend/public/snapshots/
+
+# Local setup & one-off scripts
+SETUP_COMPLETE.txt
+scratch_ans.txt

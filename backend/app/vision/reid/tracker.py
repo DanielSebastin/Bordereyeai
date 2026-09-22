@@ -2,7 +2,7 @@ import datetime
 import numpy as np
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from database.models import GlobalPerson, PersonSighting, Camera
+from ...database.models import GlobalPerson, PersonSighting, Camera
 
 class TrajectoryReconstructor:
     """

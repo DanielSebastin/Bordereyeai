@@ -15,8 +15,8 @@ import { BACKEND_URL } from "@/lib/detectionStream";
 
 export default function InvestigationCenterPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [allIncidents, setAllIncidents] = useState<Incident[]>(baseIncidents);
-  const [selectedId, setSelectedId] = useState(baseIncidents[0].id);
+  const [allIncidents, setAllIncidents] = useState<Incident[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [liveConnected, setLiveConnected] = useState(false);
 
   useEffect(() => {
@@ -124,10 +124,11 @@ export default function InvestigationCenterPage() {
 
         if (isMounted) {
           if (dynamicIncidents.length > 0) {
-            setAllIncidents([...dynamicIncidents, ...baseIncidents]);
+            setAllIncidents([...dynamicIncidents]);
+            setSelectedId(prev => prev || dynamicIncidents[0].id);
             setLiveConnected(true);
           } else {
-            setAllIncidents(baseIncidents);
+            setAllIncidents([]);
             setLiveConnected(true);
           }
         }
@@ -214,25 +215,33 @@ export default function InvestigationCenterPage() {
           />
 
           {/* SECTION 1 — Incident queue */}
-          <IncidentQueue incidents={allIncidents} selectedId={selected.id} onSelect={setSelectedId} />
+          <IncidentQueue incidents={allIncidents} selectedId={selectedId || ""} onSelect={setSelectedId} />
 
           {/* SECTION 2 — Incident details */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 65fr) minmax(0, 35fr)",
-              gap: 10,
-            }}
-          >
-            {/* Left — details + evidence timeline */}
-            <IncidentDetails incident={selected} />
+          {selected ? (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 65fr) minmax(0, 35fr)",
+                  gap: 10,
+                }}
+              >
+                {/* Left — details + evidence timeline */}
+                <IncidentDetails incident={selected} />
 
-            {/* Right — evidence snapshot */}
-            <EvidenceSnapshot incident={selected} />
-          </div>
+                {/* Right — evidence snapshot */}
+                <EvidenceSnapshot incident={selected} />
+              </div>
 
-          {/* SECTION 3 — Linked detections */}
-          <LinkedDetections detections={baseLinkedDetections} />
+              {/* SECTION 3 — Linked detections */}
+              {/* <LinkedDetections detections={baseLinkedDetections} /> */}
+            </>
+          ) : (
+            <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+              No active security incidents or evidence records found.
+            </div>
+          )}
         </div>
 
         {/* Institutional Government Footer */}

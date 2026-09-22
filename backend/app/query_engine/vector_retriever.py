@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from database.models import SurveillanceEvent, WatchlistRecord, GlobalPerson
+from ..database.models import SurveillanceEvent, WatchlistRecord, GlobalPerson
 
 class SurveillanceVectorRetriever:
     """

@@ -45,11 +45,19 @@ except Exception:
     torch = None
 
 from app import face_pipeline
-from app.anpr_util import refine_plate, complies_format
+from app.anpr_util import refine_plate, complies_format, enhance_plate  # FIX 6
 from app.intrusion import FenceEngine
+# FIX 6 — import shared OCR functions instead of duplicating them.
+from app.vision.anpr_ocr import (
+    ocr_plate_crop_rapid as _ocr_plate_crop,
+    ocr_plate_crop_clone as _ocr_plate_crop_clone,
+    _plate_score,
+)
+from app.config import settings  # FIX 7, 13
 
-# Keep EasyOCR's model weights on D: (C: is nearly full).
-os.environ.setdefault("EASYOCR_MODULE_PATH", r"D:\easyocr-models")
+# FIX 13 — EasyOCR module path is now read from settings (portable, env-overridable).
+# Previously hardcoded to r"D:\easyocr-models" which broke on Linux/Docker.
+os.environ.setdefault("EASYOCR_MODULE_PATH", settings.EASYOCR_MODULE_PATH)
 
 # cam-02 ANPR experiment: adopt the anpr-yolov8 clone's *association* rule
 # (get_car: a plate is emitted only while a tracked vehicle fully contains it;
@@ -73,22 +81,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 PUBLIC_DIR = BASE_DIR.parent / "public"
 WEIGHTS_PATH = BASE_DIR / "weights" / "yolo11n.pt"
 
-DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-HALF = bool(torch.cuda.is_available())  # fp16 on the dGPU, fp32 elsewhere
+# FIX 7 — GPU/HALF derived from settings.USE_GPU (auto-detected at import via
+# config._detect_gpu).  No more hardcoded torch.cuda.is_available() calls.
+DEVICE = "cuda:0" if settings.USE_GPU else "cpu"
+HALF = settings.USE_GPU  # fp16 on CUDA, fp32 on CPU
 
-# Fallback weight location (already present on this machine).
-_FALLBACK_WEIGHTS = [
-    Path(r"D:\CCTVBORDERSURVEILLANCE\backend\yolo11n.pt"),
-    Path.home() / ".cache" / "ultralytics" / "yolo11n.pt",
-]
-
+# FIX 13 — _FALLBACK_WEIGHTS replaced by settings.YOLO_WEIGHT_CANDIDATES
+# (portable, env-overridable, no hard-coded machine-specific paths).
 
 def resolve_weights() -> Path:
-    if WEIGHTS_PATH.exists():
-        return WEIGHTS_PATH
-    for p in _FALLBACK_WEIGHTS:
-        if p.exists():
-            return p
+    for p in settings.YOLO_WEIGHT_CANDIDATES:
+        if Path(p).exists():
+            return Path(p)
     return Path("yolo11n.pt")  # ultralytics will download on first use
 
 
@@ -215,7 +219,7 @@ CameraPipeline(
         camera_id="cam-02",
         video="vehicledetectionanprclass.mp4",
         classes=[2, 3, 5, 7],
-        label_map={2: "Car", 3: "Motorcycle", 5: "Bus", 7: "Truck"},
+        label_map={2: "car", 3: "motorcycle", 5: "bus", 7: "truck"},
         conf=0.3,
         imgsz=512,  # 640 was capping throughput <30fps; 512 keeps ~30fps
         proc_every=1,
@@ -301,151 +305,58 @@ def _normalize(bb_xyxyn, frame_w: int, frame_h: int, class_id: int, label: str, 
 
 
 def _enhance_plate(crop_bgr):
-    """Grayscale + CLAHE + upscale to make small plates OCR-able.
-    Scales 2x for large crops (saves CPU), 3x for small ones."""
-    gray = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2GRAY)
-    fx = 2.0 if gray.shape[1] >= 360 else 3.0
-    gray = cv2.resize(gray, None, fx=fx, fy=fx, interpolation=cv2.INTER_CUBIC)
-    gray = cv2.createCLAHE(3.0, (8, 8)).apply(gray)
-    return cv2.medianBlur(gray, 3)
+    """FIX 6 — delegate to the single shared implementation in anpr_util."""
+    return enhance_plate(crop_bgr)
 
 
-def _plate_score(ref: str, ocr_conf: float) -> float:
-    """Rank a plate candidate: prefer clean 7-char LL-DD-LLL reads, then OCR confidence."""
-    s = float(ocr_conf)
-    if len(ref) == 7 and complies_format(ref):
-        return 100.0 + s
-    if len(ref) == 7:
-        return 60.0 + s
-    return 20.0 + s
+# FIX 6 — _plate_score now imported from anpr_ocr (single source of truth).
+# The local alias keeps all existing call-sites working.
 
 
-def _ocr_plate_crop(ocr, crop_bgr) -> dict | None:
-    """OCR a vehicle crop's lower bands and keep the best candidate.
-    Bottom 40% is tried first; a clean 7-char LL-DD-LLL read short-circuits.
-    Otherwise the bottom 30% band is checked too and the best of both is kept."""
-    ch, cw = crop_bgr.shape[:2]
-    if ch < 20 or cw < 30:
-        return None
-    best: tuple[float, str, list] | None = None
-    best_band: float = 0.6
-
-    def scan(band_frac: float) -> bool:
-        nonlocal best, best_band
-        band = crop_bgr[int(ch * band_frac):, :]
-        if band.shape[0] < 14 or band.shape[1] < 24:
-            return False
-        try:
-            result, _ = ocr(_enhance_plate(band))
-        except Exception:
-            return False
-        if not result:
-            return False
-        found = False
-        for bx, text, score in result:
-            raw = "".join(c2 for c2 in text.upper() if c2.isalnum())
-            if len(raw) < 6 or len(raw) > 12:
-                continue
-            ref = refine_plate(raw)
-            if ref is None:
-                continue
-            pts = _plate_score(ref, score)
-            if best is None or pts > best[0]:
-                best = (pts, ref, bx)
-                best_band = band_frac
-            found = True
-        return found
-
-    if scan(0.6) and best and best[0] >= 100.0:
-        pass  # clean 7-char plate found in bottom 40% — enough
-    else:
-        scan(0.7)
-    if best is None:
-        return None
-    _, label, bx = best
-    xs = [int(p[0]) for p in bx]
-    ys = [int(p[1]) for p in bx]
-    return {
-        "cls": "plate",
-        "label": label,
-        "confidence": 0.9,
-        "bbox_crop": [min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)],
-        "band": best_band,  # which crop band (0.6/0.7) the winning OCR box came from
-    }
+# FIX 6 — _ocr_plate_crop is imported from anpr_ocr as ocr_plate_crop_rapid.
+# The import alias at the top of this file maps it to _ocr_plate_crop so all
+# existing call-sites continue to work without modification.
 
 
 def _get_easy_reader(p: CameraPipeline):
-    """Lazy EasyOCR reader for clone mode; None until the weights are warmed up."""
+    """Lazy EasyOCR reader for clone mode; None until the weights are warmed up.
+
+    FIX 7 — gpu= is now read from settings.USE_GPU (auto-detected at startup)
+    instead of being hardcoded to True.  Never silently disables ANPR on
+    CPU-only machines.
+    """
     if p.easy_reader is not None:
         return p.easy_reader
     try:
         import easyocr
-
-        p.easy_reader = easyocr.Reader(["en"], gpu=True, verbose=False)
+        use_gpu = settings.USE_GPU   # FIX 7
+        p.easy_reader = easyocr.Reader(["en"], gpu=use_gpu, verbose=False)
+        print(
+            f"[{p.camera_id}] EasyOCR ready ({'GPU' if use_gpu else 'CPU'}).",
+            flush=True,
+        )
     except Exception as e:
         print(f"[{p.camera_id}] easyocr unavailable: {e}", flush=True)
         return None
     return p.easy_reader
 
 
-def _ocr_plate_crop_clone(reader, crop_bgr) -> dict | None:
-    """Clone-method OCR: enhance + threshold-binarize the band (anpr-yolov8's
-    noise handling: THRESH_BINARY_INV @ 64) then readtext with EasyOCR.
+# FIX 6 — _ocr_plate_crop_clone is imported from anpr_ocr.
+# The import alias at the top of this file maps it to _ocr_plate_crop_clone.
 
-    Same return contract as `_ocr_plate_crop`: bbox_crop in *up-scaled band
-    image* coordinates + the winning band, so `_plate_frame_box` inverts it
-    identically.
-    """
-    ch, cw = crop_bgr.shape[:2]
-    if ch < 20 or cw < 30:
-        return None
-    best: tuple[float, str, list] | None = None
-    best_band: float = 0.6
 
-    def scan(band_frac: float) -> bool:
-        nonlocal best, best_band
-        band = crop_bgr[int(ch * band_frac):, :]
-        if band.shape[0] < 14 or band.shape[1] < 24:
-            return False
-        try:
-            gray = _enhance_plate(band)
-            _, binary = cv2.threshold(gray, 64, 255, cv2.THRESH_BINARY_INV)
-            result = reader.readtext(binary)
-        except Exception:
-            return False
-        if not result:
-            return False
-        found = False
-        for bx, text, score in result:
-            raw = "".join(c2 for c2 in text.upper() if c2.isalnum())
-            if len(raw) < 6 or len(raw) > 12:
-                continue
-            ref = refine_plate(raw)
-            if ref is None:
-                continue
-            pts = _plate_score(ref, score)
-            if best is None or pts > best[0]:
-                best = (pts, ref, bx)
-                best_band = band_frac
-            found = True
-        return found
-
-    if scan(0.6) and best and best[0] >= 100.0:
-        pass  # clean 7-char plate found in bottom 40% — enough
-    else:
-        scan(0.7)
-    if best is None:
-        return None
-    _, label, bx = best
-    xs = [int(p[0]) for p in bx]
-    ys = [int(p[1]) for p in bx]
-    return {
-        "cls": "plate",
-        "label": label,
-        "confidence": 0.9,
-        "bbox_crop": [min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)],
-        "band": best_band,
-    }
+def _get_plate_detector(p: CameraPipeline):
+    """Lazy-load the YOLO plate detector."""
+    if getattr(p, "plate_detector", None) is not None:
+        return p.plate_detector
+    try:
+        from ultralytics import YOLO
+        p.plate_detector = YOLO(settings.LICENSE_PLATE_DETECTOR_PATH)
+        print(f"[{p.camera_id}] Plate detector ready.", flush=True)
+    except Exception as e:
+        print(f"[{p.camera_id}] Plate detector unavailable: {e}", flush=True)
+        p.plate_detector = None
+    return p.plate_detector
 
 
 def ocr_worker(p: CameraPipeline) -> None:
@@ -456,11 +367,12 @@ def ocr_worker(p: CameraPipeline) -> None:
             pending = p.ocr_queue.pop(0)
         if pending is not None:
             try:
+                plate_detector = _get_plate_detector(p)
                 if p.anpr_ocr == "clone":
                     reader = _get_easy_reader(p)
-                    res = _ocr_plate_crop_clone(reader, pending["crop"]) if reader else _ocr_plate_crop(p.ocr, pending["crop"])
+                    res = _ocr_plate_crop_clone(reader, plate_detector, pending["crop"]) if reader else _ocr_plate_crop(p.ocr, plate_detector, pending["crop"])
                 else:
-                    res = _ocr_plate_crop(p.ocr, pending["crop"])
+                    res = _ocr_plate_crop(p.ocr, plate_detector, pending["crop"])
             except Exception:
                 res = None
             if res and pending.get("epoch") == p.epoch:

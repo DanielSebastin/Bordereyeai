@@ -54,7 +54,13 @@ export default function LinkedDetections({ detections }: LinkedDetectionsProps) 
             >
               {/* Thumbnail */}
               <div style={{ aspectRatio: "16 / 9" }}>
-                <SurveillanceFrame variant={d.frameVariant} camera={d.camera} time={d.time} compact />
+                <SurveillanceFrame 
+                  variant={d.frameVariant} 
+                  camera={d.camera} 
+                  time={d.time} 
+                  snapshotUrl={d.snapshotUrl}
+                  compact 
+                />
               </div>
 
               {/* Card body */}

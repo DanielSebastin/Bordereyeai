@@ -9,14 +9,24 @@ from typing import Dict, Any, List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import settings
-from database.db_session import SessionLocal, init_db
-from database.models import Camera, GlobalPerson, PersonSighting, SurveillanceEvent
-from reid_engine.pipeline import MultiCameraReIDPipeline
-from reid_engine.tracker import TrajectoryReconstructor
-from realtime_threat_engine import RealTimeThreatAndExpressionEngine
-from nl_query_engine.llm_client import UnifiedLLMClient
-from nl_query_engine.vector_retriever import SurveillanceVectorRetriever
+from ..config import settings
+from ..database.db_session import SessionLocal, init_db
+from ..database.models import Camera, GlobalPerson, PersonSighting, SurveillanceEvent
+from ..vision.reid.pipeline import MultiCameraReIDPipeline
+from ..vision.reid.tracker import TrajectoryReconstructor
+try:
+    from realtime_threat_engine import RealTimeThreatAndExpressionEngine
+except ImportError:
+    RealTimeThreatAndExpressionEngine = None
+
+class _DummyThreatEngine:
+    def analyze(self, *a, **kw): return {}
+    def get_threat_level(self, *a, **kw): return "low"
+
+if RealTimeThreatAndExpressionEngine is None:
+    RealTimeThreatAndExpressionEngine = _DummyThreatEngine
+from .llm_client import UnifiedLLMClient
+from .vector_retriever import SurveillanceVectorRetriever
 
 # Ground-truth visual scene descriptors extracted from frame inspection
 KNOWN_VIDEO_VISUAL_FACTS = {

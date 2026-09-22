@@ -1,4 +1,3 @@
-from __future__ import annotations
 # BorderEye AI — Watchlist trainer
 #
 #   Images -> Face Detection (RetinaFace) -> Face Embeddings (ArcFace) -> Watchlist
@@ -7,7 +6,7 @@ from __future__ import annotations
 # stores the embeddings under the person's name. No manual image selection.
 #
 # Usage:
-#   python -m app.train_watchlist --name Daniel --folder D:\IVBAP\bordereye-ai\mybeautifulface
+#   python -m app.vision.train_watchlist --name YourName --folder D:\path\to\photos
 import argparse
 import glob
 import os
@@ -16,16 +15,8 @@ import time
 
 import cv2
 
-try:
-    from .face_detector import FaceDetector
-    from .watchlist_manager import WatchlistManager
-except ImportError:
-    try:
-        from app.vision.face_detector import FaceDetector
-        from app.vision.watchlist_manager import WatchlistManager
-    except ImportError:
-        from face_detector import FaceDetector
-        from watchlist_manager import WatchlistManager
+from app.vision.face_detector import FaceDetector
+from app.vision.watchlist_manager import WatchlistManager
 
 IMAGE_EXTS = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp", "*.tiff", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP")
 
@@ -69,10 +60,10 @@ def train(name: str, folder: str, min_det: float, manager: WatchlistManager | No
     print(f"[train] stored person_id={person['person_id']} name={person['name']} "
           f"embeddings={len(embeddings)} (det_score>={min_det:.2f})")
 
-    # Self-check: each stored embedding should match Daniel.
+    # Self-check: each stored embedding should match the person.
     sims = [manager.best_match(e, threshold=-1.0)[1] for e in embeddings]
     pos = sum(1 for s in sims if s >= 0.45)
-    print(f"[train] self-check: {pos}/{len(sims)} embeddings match Daniel at sim>=0.45 "
+    print(f"[train] self-check: {pos}/{len(sims)} embeddings match {name} at sim>=0.45 "
           f"(min={min(sims):.3f} median={sorted(sims)[len(sims)//2]:.3f} max={max(sims):.3f})")
     print(f"[train] watchlist DB: {manager.path}")
     return {"images": processed, "faces": len(embeddings), "person": person, "rejected": rejected}
@@ -80,8 +71,8 @@ def train(name: str, folder: str, min_det: float, manager: WatchlistManager | No
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Train watchlist embeddings from a face image folder")
-    ap.add_argument("--name", default="Daniel")
-    ap.add_argument("--folder", default=r"D:\IVBAP\bordereye-ai\mybeautifulface")
+    ap.add_argument("--name", required=True, help="Person's name for the watchlist")
+    ap.add_argument("--folder", required=True, help="Folder containing face images")
     ap.add_argument("--min-det", type=float, default=0.4, help="minimum RetinaFace detection score")
     args = ap.parse_args()
     t0 = time.time()

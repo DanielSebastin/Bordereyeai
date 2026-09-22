@@ -1,10 +1,13 @@
-from __future__ import annotations
-# BorderEye AI — Face recognizer (ArcFace cosine matching & Access Control)
-
+# BorderEye AI — Face recognizer (ArcFace cosine matching)
+#
+# The stored watchlist embeddings are L2-normalized; matching is pure cosine
+# similarity against every stored embedding, keeping the best hit.
 import numpy as np
+
 from .watchlist_manager import WatchlistManager
 
-DEFAULT_THRESHOLD = 0.46
+DEFAULT_THRESHOLD = 0.45  # buffalo_l ArcFace; lower = more permissive
+
 
 class FaceRecognizer:
     def __init__(self, manager: WatchlistManager, threshold: float = DEFAULT_THRESHOLD) -> None:
@@ -12,25 +15,25 @@ class FaceRecognizer:
         self.threshold = threshold
 
     def identify(self, embedding: np.ndarray) -> dict:
-        """Map a face embedding to an access control decision.
-        
-        Returns:
-          - Authorized: {"label": "Name", "designation": "Title", "status": "AUTHORIZED", "watchlist": True, "confidence": float}
-          - Intruder:   {"label": "INTRUDER", "designation": "Unauthorized Entity", "status": "INTRUDER", "watchlist": False, "confidence": float}
+        """Map a face embedding to a recognition verdict.
+
+        Returns per-object identity fields including status and designation
+        required by face_pipeline.py:
+          {"label", "watchlist", "confidence", "status", "designation"}
         """
         person, sim = self.manager.best_match(embedding, threshold=self.threshold)
         if person is None:
             return {
-                "label": "INTRUDER",
-                "designation": "Unauthorized Access",
-                "status": "INTRUDER",
+                "label": "Unknown",
                 "watchlist": False,
                 "confidence": round(max(sim, 0.0), 3),
+                "status": "INTRUDER",
+                "designation": "Unauthorized Entity",
             }
         return {
             "label": person["name"],
-            "designation": person.get("designation", "Authorized Personnel"),
-            "status": "AUTHORIZED",
             "watchlist": True,
             "confidence": round(sim, 3),
+            "status": "AUTHORIZED",
+            "designation": person.get("designation", "Authorized Personnel"),
         }

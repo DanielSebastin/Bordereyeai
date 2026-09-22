@@ -27,6 +27,7 @@ const CELL: React.CSSProperties = {
   overflow: "hidden",
 };
 
+
 function Row({ row, index }: { row: AlertRow; index: number }) {
   const sev  = SEV[row.severity];
   const Icon = TYPE_ICON[row.iconType];
@@ -94,6 +95,7 @@ function Row({ row, index }: { row: AlertRow; index: number }) {
 }
 
 export default function RecentAlerts() {
+
   return (
     <div style={{
       background: "#FFFFFF",

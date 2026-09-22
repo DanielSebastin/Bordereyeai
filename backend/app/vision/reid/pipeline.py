@@ -4,8 +4,8 @@ import datetime
 import numpy as np
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
-from config import settings
-from database.models import PersonSighting, Camera
+from ...config import settings
+from ...database.models import PersonSighting, Camera
 from .detector import PersonDetector
 from .extractor import ReIDFeatureExtractor
 from .matcher import CrossCameraMatcher

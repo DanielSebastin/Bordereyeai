@@ -16,36 +16,51 @@ const THREAT_COLOR: Record<ThreatLevel, string> = {
   low:      "#22c55e",
 };
 
-// ─── Camera marker (pill label) ────────────────────────────────────────────────
-
 function createMarkerIcon(cam: CameraLocation) {
   const color = THREAT_COLOR[cam.threatLevel];
-  const statusColor = cam.status === "online" ? "#1A6B3C" : cam.status === "degraded" ? "#C05000" : "#B71C1C";
+  const statusColor = cam.status === "online" ? "#10B981" : cam.status === "degraded" ? "#F59E0B" : "#EF4444";
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="26" viewBox="0 0 110 26">
-    <defs>
-      <filter id="f${cam.id}" x="-30%" y="-30%" width="160%" height="160%">
-        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,32,96,0.2)"/>
-      </filter>
-    </defs>
-    <rect x="0" y="0" width="110" height="26" rx="13"
-      fill="#FFFFFF" stroke="${color}" stroke-width="1.5"
-      filter="url(#f${cam.id})"/>
-    <circle cx="13" cy="13" r="9" fill="${color}18" stroke="${color}55" stroke-width="0.8"/>
-    <rect x="7.5" y="10" width="9" height="6.5" rx="1.5" fill="none" stroke="${color}" stroke-width="1.1"/>
-    <circle cx="12" cy="13.2" r="1.8" fill="none" stroke="${color}" stroke-width="0.9"/>
-    <path d="M16.5 11.5L19 10.2L19 16L16.5 14.5" fill="${color}" opacity="0.75"/>
-    <circle cx="20" cy="6.5" r="2.8" fill="${statusColor}" stroke="#FFFFFF" stroke-width="1.1"/>
-    <text x="28" y="16.5" font-family="'Noto Sans', sans-serif" font-size="9.5"
-      font-weight="700" fill="#002060" letter-spacing="0.02em">${cam.name}</text>
-  </svg>`;
+  const html = `
+    <div style="
+      display: flex;
+      align-items: center;
+      background-color: #1A2535;
+      border: 1.5px solid ${color};
+      border-radius: 20px;
+      padding: 3px 10px 3px 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      width: max-content;
+      transform: translate(-15px, -15px);
+    ">
+      <div style="
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background-color: ${color}20;
+        border: 1px solid ${color};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 6px;
+      ">
+        <div style="width: 6px; height: 6px; border-radius: 50%; background-color: ${statusColor};"></div>
+      </div>
+      <span style="
+        font-family: 'Noto Sans', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: #FFFFFF;
+        white-space: nowrap;
+      ">${cam.name}</span>
+    </div>
+  `;
 
   return L.divIcon({
-    html: svg,
+    html: html,
     className: "",
-    iconSize: [110, 26],
-    iconAnchor: [13, 13],
-    popupAnchor: [42, -15],
+    iconSize: [0, 0], // Allows the CSS transform and auto-width to determine size
+    iconAnchor: [0, 0],
+    popupAnchor: [0, -20],
   });
 }
 
@@ -89,14 +104,14 @@ function CanvasHeatmap({ points }: { points: HeatPt[] }) {
       const alpha = Math.min(pt.intensity * 0.72, 0.72);
 
       let r: number, g: number, b: number;
-      if (pt.intensity >= 0.8)       { r = 239; g = 68;  b = 68;  }
-      else if (pt.intensity >= 0.6)  { r = 249; g = 115; b = 22;  }
-      else if (pt.intensity >= 0.35) { r = 234; g = 179; b = 8;   }
-      else                           { r = 34;  g = 197; b = 94;  }
+      if (pt.intensity >= 0.8)       { r = 239; g = 68;  b = 68;  } // Red
+      else if (pt.intensity >= 0.6)  { r = 249; g = 115; b = 22;  } // Orange
+      else if (pt.intensity >= 0.35) { r = 234; g = 179; b = 8;   } // Yellow
+      else                           { r = 59;  g = 130; b = 246; } // Blue
 
       const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
       grad.addColorStop(0,    `rgba(${r},${g},${b},${alpha})`);
-      grad.addColorStop(0.45, `rgba(${r},${g},${b},${alpha * 0.5})`);
+      grad.addColorStop(0.5,  `rgba(${r},${g},${b},${alpha * 0.4})`);
       grad.addColorStop(1,    `rgba(${r},${g},${b},0)`);
 
       ctx.beginPath();
@@ -115,7 +130,6 @@ function CanvasHeatmap({ points }: { points: HeatPt[] }) {
           position:      "absolute",
           pointerEvents: "none",
           zIndex:        "400",
-          mixBlendMode:  "screen",
         });
         m.getPanes().overlayPane!.appendChild(canvas);
         canvasRef.current = canvas;

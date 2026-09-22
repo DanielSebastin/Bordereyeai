@@ -12,21 +12,24 @@ services:
     environment:
       - PORT=8000
       - HOST=0.0.0.0
-      - DEVICE=cuda
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - DEVICE=cpu
       - LLM_PROVIDER=${LLM_PROVIDER:-groq}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     volumes:
       - bordereye-data:/app/data
+      # Mount video files for AI inference
+      - ./cam1.mp4:/app/cam1.mp4:ro
+      - ./cam2.mp4:/app/cam2.mp4:ro
+      - ./cam3.mp4:/app/cam3.mp4:ro
+      - ./cam4.mp4:/app/cam4.mp4:ro
+      - ./cam5.mp4:/app/cam5.mp4:ro
+      # Mount frontend videos too
+      - ./frontend/public/cam1.mp4:/app/frontend/public/cam1.mp4:ro
+      - ./frontend/public/cam2.mp4:/app/frontend/public/cam2.mp4:ro
+      - ./frontend/public/cam3.mp4:/app/frontend/public/cam3.mp4:ro
+      - ./frontend/public/cam4.mp4:/app/frontend/public/cam4.mp4:ro
+      - ./frontend/public/cam5.mp4:/app/frontend/public/cam5.mp4:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 20s

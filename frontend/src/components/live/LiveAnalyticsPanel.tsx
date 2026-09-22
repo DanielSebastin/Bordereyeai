@@ -146,7 +146,7 @@ export default function LiveAnalyticsPanel() {
         <div style={{ padding: "4px 10px 6px" }}>
           {liveModels.map((m, i) => (
             <div
-              key={m.name || i}
+              key={`${m.name}-${i}`}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                 padding: "5px 0",
