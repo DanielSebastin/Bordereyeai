@@ -342,7 +342,7 @@ sih_border_surveillance/
 
 ---
 
-## ⚙️ Setup & Installation
+## ⚙️ Local Setup
 
 ### Prerequisites
 
@@ -350,61 +350,39 @@ sih_border_surveillance/
 |---|---|
 | Python | 3.10+ |
 | Node.js | 18+ |
-| CUDA (optional, for GPU) | 12.x |
-| Docker Desktop | Latest |
 
 ---
 
-### Option A — Local Development (Recommended for Development)
-
-#### 1. Clone the Repository
+#### 1. Clone & Configure
 
 ```bash
 git clone https://github.com/DanielSebastin/Bordereyeai.git
 cd Bordereyeai
-```
-
-#### 2. Configure Environment
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your settings:
+Edit `.env`:
 
 ```env
-# LLM Provider (groq / openai / gemini / ollama)
 LLM_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key_here
-
-# Database (SQLite default, PostgreSQL optional)
 DATABASE_URL=sqlite:///./surveillance.db
-
-# Device (cpu / cuda)
 DEVICE=cpu
 ```
 
-> Get a free Groq API key at [console.groq.com](https://console.groq.com) — Llama 3.3 70B is free and fast.
-
-#### 3. Set Up Backend
+#### 2. Start Backend
 
 ```powershell
-# Create virtual environment
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
-# Install dependencies
 pip install -r ..\requirements.txt
-
-# Start backend
 python -m app.main
 ```
 
-Backend runs at: **http://localhost:8000**  
-API Docs at: **http://localhost:8000/docs**
+Backend → **http://localhost:8000** · API Docs → **http://localhost:8000/docs**
 
-#### 4. Set Up Frontend
+#### 3. Start Frontend
 
 ```powershell
 cd frontend
@@ -412,128 +390,20 @@ npm install
 npm run dev
 ```
 
-Frontend runs at: **http://localhost:3000**
+Frontend → **http://localhost:3000**
 
-#### 5. Add Video Sources
+#### 4. Add Camera Feeds
 
-Place your CCTV video files (or sample files) in the project root:
+Place CCTV video files in the project root:
 ```
-cam1.mp4   → Person tracking (human detection)
+cam1.mp4   → Person tracking
 cam2.mp4   → Vehicle detection + ANPR
-cam3.mp4   → Low-light / night surveillance
-cam4.mp4   → Virtual fence / intrusion detection
-cam5.mp4   → Watchlist face monitoring
+cam3.mp4   → Low-light surveillance
+cam4.mp4   → Virtual fence zone
+cam5.mp4   → Watchlist monitoring
 ```
 
----
-
-### Option B — Docker (Recommended for Deployment)
-
-#### 1. Configure `.env`
-
-```bash
-cp .env.example .env
-# Edit .env with your GROQ_API_KEY
-```
-
-#### 2. Start with Docker Compose
-
-```bash
-docker compose up --build -d
-```
-
-Services start at:
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:8000
-- **API Docs:** http://localhost:8000/docs
-
-#### 3. View Logs
-
-```bash
-# Backend logs
-docker logs -f bordereye-backend
-
-# Frontend logs
-docker logs -f bordereye-frontend
-```
-
-#### 4. Stop Services
-
-```bash
-docker compose down
-```
-
----
-
-### Option C — GPU Acceleration (NVIDIA RTX)
-
-For NVIDIA GPU (CUDA), replace `DEVICE=cpu` with `DEVICE=cuda` in `.env`.
-
-Install CUDA-enabled PyTorch:
-
-```bash
-pip uninstall torch torchvision -y
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-```
-
-Verify GPU:
-
-```python
-import torch
-print("CUDA available:", torch.cuda.is_available())
-# CUDA available: True
-```
-
-**Performance comparison:**
-
-| Mode | FPS per Camera | Max Cameras |
-|---|---|---|
-| CPU (OpenVINO) | 11–14 FPS | 3 simultaneous |
-| GPU (CUDA RTX 4050) | 30–50 FPS | 6+ simultaneous |
-
----
-
-## 🔧 Enrolling Faces into the Watchlist
-
-To add known persons of interest or authorized personnel:
-
-```python
-# backend/
-python -m app.vision.train_watchlist
-```
-
-Or via the **Threat Intelligence** page in the dashboard → Enroll Personnel / Roster.
-
----
-
-## 🎛️ ByteTrack Tuning
-
-Adjust `backend/bytetrack_custom.yaml` for your deployment:
-
-```yaml
-tracker_type: bytetrack
-track_high_thresh: 0.6    # High-confidence detections
-track_low_thresh: 0.2     # Low-confidence recovery
-new_track_thresh: 0.7     # New identity creation threshold
-track_buffer: 60          # Frames to hold lost tracks
-match_thresh: 0.9         # IoU matching threshold
-```
-
----
-
-## 🔍 Sample Natural Language Queries
-
-```
-"Show me all cameras"
-"List active security events from today"
-"Find all watchlist matches in the last 24 hours"
-"Show suspicious loitering events near Gate A"
-"Track person ID 42 across all cameras"
-"Generate an intelligence report for Zone B today"
-"Find vehicles that entered but didn't exit"
-"Show me everyone who appeared in both CAM-01 and CAM-03"
-"Who triggered the virtual fence alarm in the last hour?"
-```
+> The platform also supports live RTSP streams from IP cameras.
 
 ---
 
@@ -541,24 +411,20 @@ match_thresh: 0.9         # IoU matching threshold
 
 | Innovation | Description |
 |---|---|
-| **Software-Only AI** | No specialized hardware required — runs on standard CCTV + commodity server |
+| **Software-Only AI** | No specialized hardware required — runs on existing CCTV + commodity server |
 | **Hybrid RAG Query** | SQL + vector semantic search + LLM synthesis for intelligence-grade reports |
 | **Sub-80ms WebSocket** | Real-time bounding box overlays with < 80ms end-to-end detection latency |
 | **Multi-Engine Audio** | YAMNet + PANNS + Whisper fusion for drone acoustic & speech intelligence |
-| **Configurable Fences** | Draw custom restricted zones per camera via the UI — no code changes |
-| **Multi-LLM Support** | Pluggable Groq / OpenAI / Gemini / Ollama — works offline with Ollama |
+| **Configurable Fences** | Draw custom restricted zones per camera via the UI — no code changes needed |
+| **Multi-LLM Support** | Pluggable Groq / OpenAI / Gemini / Ollama — works fully offline with Ollama |
 | **SHA-256 Audit Log** | Tamper-evident event logs suitable for legal evidence and court proceedings |
 | **Cross-Camera Re-ID** | 14.2ms identity match across non-overlapping cameras with 99.8% accuracy |
 
 ---
 
-## 🌐 Deployment
+## 🌐 Live Deployment
 
-The system is deployed on Render:
-- **Frontend:** [bordereye-frontend.onrender.com](https://bordereye-frontend.onrender.com)
-- **Backend:** Render Web Service (see `render.yaml`)
-
-For Render deployment configuration, see [`render.yaml`](render.yaml).
+> **[bordereye-frontend.onrender.com](https://bordereye-frontend.onrender.com)**
 
 ---
 
@@ -568,30 +434,22 @@ For Render deployment configuration, see [`render.yaml`](render.yaml).
 - **GDx 3.0 Compliant** — Government Digital Experience standards
 - **NIC-CERT Monitored** — National Informatics Centre security monitoring
 - **SHA-256 verified logs** — all detection events are cryptographically signed
-- **Secrets:** API keys are never committed — use `.env` (see `.env.example`)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 🤝 Team
-
-Built for **Smart India Hackathon 2024** — Ministry of Home Affairs, Border Security Division.
-
-> *"Transforming passive CCTV infrastructure into an active, intelligent border sentinel — entirely in software."*
+[MIT License](LICENSE)
 
 ---
 
 <div align="center">
 
-**भारत सरकार · GOVERNMENT OF INDIA**  
-Ministry of Home Affairs — Border Security Division  
-`RESTRICTED · OFFICIAL USE ONLY`
+**Built for Smart India Hackathon 2024**  
+Ministry of Home Affairs — Border Security Division
 
-[![Live Demo](https://img.shields.io/badge/🌐_Try_Live_Demo-Click_Here-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
+> *"Transforming passive CCTV infrastructure into an active, intelligent border sentinel — entirely in software."*
+
+[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-bordereye--frontend.onrender.com-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
 
 </div>
