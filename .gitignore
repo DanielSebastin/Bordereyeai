@@ -81,11 +81,14 @@ yarn-error.log*
 pip_out.txt
 build_log.txt
 
-# Scratch / local-only images
+# Scratch / local-only images at root level
 *.jpeg
 *.jpg
-*.png
 ia.jpg
+
+# Block stray PNGs at root but allow docs/screenshots
+*.png
+!docs/screenshots/*.png
 
 # Nested sub-repos / third-party clones (not part of this project)
 IVBAP_repo/
