@@ -2,13 +2,13 @@
 
 <img src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" width="60" alt="Government of India Emblem"/>
 
-# 🛡️ BorderEye AI — Intelligent Video Analytics Platform for Border Surveillance
+# BorderEye AI — Intelligent Video Analytics Platform for Border Surveillance
 
 ### *AI-Based Intelligent Video Analytics Platform for Border Surveillance using Existing CCTV Infrastructure*
 
 **Smart India Hackathon 2026 | Ministry of Home Affairs — Border Security Division**
 
-[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-bordereye--frontend.onrender.com-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-bordereye--frontend.onrender.com-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -22,7 +22,7 @@
 
 ---
 
-## 📋 Problem Statement
+## Problem Statement
 
 **PS Title:** AI-Based Intelligent Video Analytics Platform for Border Surveillance using Existing CCTV Infrastructure
 
@@ -38,13 +38,13 @@ BorderEye AI is an **AI-driven software platform** that transforms existing CCTV
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
 > **[https://bordereye-frontend.onrender.com](https://bordereye-frontend.onrender.com)**
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 ### Live Monitoring Dashboard — 5-Camera Simultaneous AI Surveillance
 ![Live Monitoring Dashboard](docs/screenshots/live_monitoring_dashboard.png)
@@ -63,7 +63,7 @@ BorderEye AI is an **AI-driven software platform** that transforms existing CCTV
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -138,29 +138,29 @@ YOLO11n Object Detection (person / vehicle / truck / motorcycle)
 
 ---
 
-## ✨ Core Features
+## Core Features
 
-### 1. 🎯 Real-Time Human Detection & Tracking
+### 1. Real-Time Human Detection & Tracking
 - **Model:** YOLO11n — detects persons across all camera streams simultaneously
 - **Tracker:** ByteTrack — maintains persistent Track IDs across frames
 - **Performance:** 11–14 FPS per camera on CPU; 30–50 FPS on NVIDIA GPU
 - **Output:** Normalized bounding boxes, confidence scores, track IDs via WebSocket
 
-### 2. 🚗 Vehicle Detection & ANPR
+### 2. Vehicle Detection & ANPR
 - **Vehicle Detection:** YOLO11n classifies car, truck, bus, motorcycle
 - **Plate Detection:** Custom YOLOv8n model trained specifically on license plates
 - **OCR Engine:** EasyOCR with binarization + Indian plate format validation
 - **Pipeline:** Vehicle crop → Plate localization → OCR → Format validation → Alert
 - **Camera:** CAM-02 (dedicated vehicle + ANPR stream)
 
-### 3. 🧑‍🤝‍🧑 Facial Recognition & Access Control
+### 3. Facial Recognition & Access Control
 - **Engine:** InsightFace — RetinaFace (detection) + ArcFace (512-d recognition)
 - **Watchlist Matching:** Real-time comparison against enrolled personnel database
 - **Alerts:** CRITICAL alert when wanted criminal is identified; green badge for authorized
 - **Enrollment:** Train watchlist via `train_watchlist.py` with enrollment photos
 - **Camera:** CAM-06 (dedicated checkpoint access control)
 
-### 4. 🔁 Cross-Camera Person Re-Identification
+### 4. Cross-Camera Person Re-Identification
 - **Extractor:** OSNet (512-dimensional L2-normalized appearance embeddings)
 - **Matcher:** Cosine similarity ranking against global identity gallery
 - **Trajectory:** Chronologically reconstructs movement paths across camera zones
@@ -168,25 +168,25 @@ YOLO11n Object Detection (person / vehicle / truck / motorcycle)
 - **Latency:** CAM-01 → CAM-03 cross-camera match in **14.2 ms**
 - **Accuracy:** 99.8% re-identification rate across 12 active identities
 
-### 5. 🚧 Virtual Fence / Tripwire Intrusion Detection
+### 5. Virtual Fence / Tripwire Intrusion Detection
 - **Mechanism:** Configurable polygon zones drawn over the camera feed
 - **Detection:** Polygon intersection test on every tracked object per frame
 - **Alert:** CRITICAL event fires instantly on tripwire breach
 - **UI:** Draw Zone / Clear controls in the Live Monitoring dashboard
 - **Camera:** CAM-04 (dedicated restricted zone monitoring)
 
-### 6. 🌙 Night-Time & Low-Light Enhancement
+### 6. Night-Time & Low-Light Enhancement
 - **Pipeline:** Histogram equalization + adaptive brightness normalization
 - **Purpose:** Maintains detection accuracy in poor-light border conditions
 - **Camera:** CAM-03 (dedicated low-light stream)
 
-### 7. 🔊 Audio Intelligence — Drone & Acoustic Threat Detection
+### 7. Audio Intelligence — Drone & Acoustic Threat Detection
 - **Engines:** YAMNet (Google AudioSet CNN), PANNS (Pre-trained Audio Neural Networks)
 - **Drone Detection:** Acoustic signature classification of UAV/drone motor sounds
 - **ASR:** OpenAI Whisper for audio transcription of suspicious communications
 - **Evidence:** Audio clips stored in the Evidence Vault with timestamps
 
-### 8. 🤖 Natural Language Surveillance Query Engine
+### 8. Natural Language Surveillance Query Engine
 - **Interface:** Ask questions in plain English — no SQL knowledge required
 - **Pipeline:** Intent Parser → Text-to-SQL → ChromaDB vector search → LLM synthesis
 - **LLM Providers:** Groq (Llama 3.3 70B), OpenAI (GPT-4o), Google Gemini, Ollama
@@ -198,20 +198,20 @@ YOLO11n Object Detection (person / vehicle / truck / motorcycle)
   - *"Show suspicious loitering events near Gate B"*
   - *"Generate an intelligence report for the North Sector"*
 
-### 9. 🗺️ Investigation Center & Evidence Vault
+### 9. Investigation Center & Evidence Vault
 - Chronological event timeline with SHA-256 verified log integrity
 - Cross-camera trajectory visualization on the deployment map
 - Screenshot and video clip exports for legal evidence
 - Linked detections across multiple cameras and time windows
 
-### 10. 📡 Real-Time WebSocket Streaming
+### 10. Real-Time WebSocket Streaming
 - Sub-80ms latency from detection to dashboard render
 - Resolution-independent normalized bounding box coordinates
 - Simultaneous 5-camera feed with < 100ms end-to-end latency
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -231,7 +231,7 @@ Full interactive docs available at: `http://localhost:8000/docs`
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -254,7 +254,7 @@ Full interactive docs available at: `http://localhost:8000/docs`
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 sih_border_surveillance/
@@ -265,7 +265,7 @@ sih_border_surveillance/
 │   │   ├── config.py                # Configuration & env settings
 │   │   ├── hub.py                   # WebSocket broadcast hub
 │   │   │
-│   │   ├── vision/                  # 🎥 Computer Vision Engine
+│   │   ├── vision/                  # Computer Vision Engine
 │   │   │   ├── main.py              # Camera pipeline orchestrator
 │   │   │   ├── camera_runner.py     # Per-camera YOLO + ByteTrack runner
 │   │   │   ├── face_pipeline.py     # Face detection & recognition pipeline
@@ -283,7 +283,7 @@ sih_border_surveillance/
 │   │   │       ├── tracker.py       # Trajectory & timeline reconstructor
 │   │   │       └── pipeline.py      # End-to-end Re-ID pipeline
 │   │   │
-│   │   ├── query_engine/            # 🤖 NL Query & RAG Engine
+│   │   ├── query_engine/            # NL Query & RAG Engine
 │   │   │   ├── rag_engine.py        # Hybrid RAG orchestrator
 │   │   │   ├── llm_client.py        # Multi-LLM provider client
 │   │   │   ├── text_to_sql.py       # Natural language → SQL
@@ -291,7 +291,7 @@ sih_border_surveillance/
 │   │   │   ├── query_parser.py      # Intent classification & entity extraction
 │   │   │   └── video_analyzer.py    # Video-based evidence analysis
 │   │   │
-│   │   ├── audio/                   # 🔊 Audio Intelligence Engine
+│   │   ├── audio/                   # Audio Intelligence Engine
 │   │   │   ├── pipeline.py          # Audio analysis orchestrator
 │   │   │   └── engines/
 │   │   │       ├── drone_engine.py  # Drone acoustic detection
@@ -299,11 +299,11 @@ sih_border_surveillance/
 │   │   │       ├── panns_engine.py  # PANNS audio classifier
 │   │   │       └── whisper_engine.py# ASR transcription
 │   │   │
-│   │   ├── database/                # 💾 Data Layer
+│   │   ├── database/                # Data Layer
 │   │   │   ├── models.py            # SQLAlchemy ORM models
 │   │   │   └── db_session.py        # DB engine & session
 │   │   │
-│   │   └── routes/                  # 🛣️ API Routes
+│   │   └── routes/                  # API Routes
 │   │       ├── routes_vision.py     # Camera & detection endpoints
 │   │       ├── routes_reid.py       # Re-ID & trajectory endpoints
 │   │       ├── routes_query.py      # NL query endpoints
@@ -339,7 +339,7 @@ sih_border_surveillance/
 
 ---
 
-## ⚙️ Local Setup
+## Local Setup
 
 ### Prerequisites
 
@@ -404,7 +404,7 @@ cam5.mp4   → Watchlist monitoring
 
 ---
 
-## 🚀 Key Innovations
+## Key Innovations
 
 | Innovation | Description |
 |---|---|
@@ -419,13 +419,13 @@ cam5.mp4   → Watchlist monitoring
 
 ---
 
-## 🌐 Live Deployment
+## Live Deployment
 
 > **[bordereye-frontend.onrender.com](https://bordereye-frontend.onrender.com)**
 
 ---
 
-## 🔒 Security & Compliance
+## Security & Compliance
 
 - **DEFNET-SEC Operational** — aligned with CERT-IN security guidelines
 - **GDx 3.0 Compliant** — Government Digital Experience standards
@@ -434,7 +434,7 @@ cam5.mp4   → Watchlist monitoring
 
 ---
 
-## 📄 License
+## License
 
 [MIT License](LICENSE)
 
@@ -447,6 +447,6 @@ Ministry of Home Affairs — Border Security Division
 
 > *"Transforming passive CCTV infrastructure into an active, intelligent border sentinel — entirely in software."*
 
-[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-bordereye--frontend.onrender.com-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-bordereye--frontend.onrender.com-blue?style=for-the-badge)](https://bordereye-frontend.onrender.com)
 
 </div>
